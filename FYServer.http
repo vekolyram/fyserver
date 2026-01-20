@@ -1,0 +1,6 @@
+@fyserver_HostAddress = http://localhost:5216
+
+GET {{fyserver_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
