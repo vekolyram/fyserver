@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -24,11 +25,11 @@ namespace fyserver
             }
             app.Use(async (context, next) =>
             {
-                await next();
                 if (context.Response.ContentType?.Contains("charset") == true)
                 {
                     context.Response.ContentType = context.Response.ContentType.Replace("; charset=utf-8", "");
                 }
+                await next();
             });
             app.MapGet("/hello", () => "Hello named route")
                .WithName("hi");
@@ -444,9 +445,8 @@ namespace fyserver
 
                 return Results.Ok(item);
             });
-
             // 6. 匹配系统
-            app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
+           app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
             {
                 var user = await config.appconfig.users.GetByIdAsync(lobbyPlayer.PlayerId);
                 if (user == null || user.Name == "<anon>")
@@ -513,18 +513,18 @@ namespace fyserver
                 return Results.Ok("OK");
             });
 
-            app.MapDelete("/lobbyplayers", (LobbyPlayer lobbyPlayer) =>
-            {
-                config.appconfig.WaitingPlayers1.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
-                config.appconfig.WaitingPlayers2.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
+            //app.MapDelete("/lobbyplayers", (LobbyPlayer lobbyPlayer) =>
+            //{
+            //    config.appconfig.WaitingPlayers1.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
+            //    config.appconfig.WaitingPlayers2.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
 
-                foreach (var code in config.appconfig.BattleCodePlayers.Keys)
-                {
-                    config.appconfig.BattleCodePlayers[code].RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
-                }
+            //    foreach (var code in config.appconfig.BattleCodePlayers.Keys)
+            //    {
+            //        config.appconfig.BattleCodePlayers[code].RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
+            //    }
 
-                return Results.Ok(new { status = 200 });
-            });
+            //    return Results.Ok(new { status = 200 });
+            //});
 
             app.MapGet("/matches/v2", async (HttpContext context) =>
             {
