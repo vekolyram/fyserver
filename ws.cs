@@ -11,7 +11,7 @@ namespace fyserver
         //        WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         public async Task StartWsServerAsync()
         {
-            var server = new WebSocketServer("ws://0.0.0.0" + ":" + config.appconfig.portWs);
+            var server = new WebSocketServer(config.appconfig.getAddressWs());
             server.RestartAfterListenError=true;
             FleckLog.Level = Fleck.LogLevel.Debug;
             // 调用 server 实例的 Start 方法启动服务器。

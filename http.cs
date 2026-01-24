@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using static fyserver.config;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace fyserver
@@ -14,8 +15,12 @@ namespace fyserver
         async public Task StartHttpServer()
         {
             builder.Services.AddOpenApi();
-            builder.WebHost.UseUrls("http://localhost" + ":" + config.appconfig.portHttp);
+            builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
             builder.Services.AddEndpointsApiExplorer();
+            builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+            {
+                options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            });
             // 配置JSON序列化
             var app = builder.Build();
             // Configure the HTTP request pipeline.
@@ -50,7 +55,7 @@ namespace fyserver
                 if (playerId > 0)
                 {
                     // 从数据库获取用户
-                    var user = config.appconfig.users.GetByIdAsync(playerId).Result;
+                    var user = GlobalState.users.GetByIdAsync(playerId).Result;
                     return user;
                 }
                 return null;
@@ -63,7 +68,7 @@ namespace fyserver
                 User? user = null;
                 try
                 {
-                    user = await config.appconfig.users.GetByUserNameAsync(session.Username);
+                    user = await GlobalState.users.GetByUserNameAsync(session.Username);
                 }
                 catch (Exception)
                 {
@@ -74,7 +79,7 @@ namespace fyserver
                 {
                     try
                     {
-                        user = await config.appconfig.users.CreateUserAsync(session.Username);
+                        user = await GlobalState.users.CreateUserAsync(session.Username);
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -94,9 +99,8 @@ namespace fyserver
                         statusCode: 403
                     );
                 }
-
                 // 设置用户存储服务
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
                 var response = new SessionResponse(
                     AchievementsUrl: $"{addressHttp}/players/{user.Id}/achievements",
                     AllKnockoutTourneys: new List<object>(),
@@ -218,10 +222,10 @@ namespace fyserver
                 var playerId = GetPlayerIdFromAuth(context);
                 if (playerId > 0)
                 {
-                    var user = await config.appconfig.users.GetByIdAsync(playerId);
+                    var user = await GlobalState.users.GetByIdAsync(playerId);
                     if (user != null)
                     {
-                        user.UserStore = config.appconfig.users;
+                        user.UserStore = GlobalState.users;
                     }
                     return user;
                 }
@@ -231,46 +235,7 @@ namespace fyserver
             app.MapGet("/", (HttpContext context) =>
             {
                 var auth = context.Request.Headers["Authorization"].FirstOrDefault();
-                string addressHttp = config.appconfig.getAddressHttp();
-                var config1 = new Config(
-                    CurrentUser: string.IsNullOrEmpty(auth) ? null : new CurrentUser(
-                        ClientId: 0,
-                        Exp: 0,
-                        ExternalId: auth["Bearer ".Length..],
-                        Iat: 1752328020,
-                        IdentityId: 0,
-                        Iss: "",
-                        Jti: "",
-                        Language: "en",
-                        Payment: "notavailable",
-                        PlayerId: int.Parse(auth["Bearer ".Length..]),
-                        Provider: "device",
-                        Roles: new List<string>(),
-                        Tier: "LIVE",
-                        UserId: int.Parse(auth["Bearer ".Length..]),
-                        UserName: auth["Bearer ".Length..]
-                    ),
-                    Endpoints: new Endpoints(
-                        Draft: $"{config.appconfig.getAddressHttp()}/draft/",
-                        Email: $"{addressHttp}/email/set",
-                        Lobbyplayers: $"{addressHttp}/lobbyplayers",
-                        Matches: $"{addressHttp}/matches",
-                        Matches2: $"{addressHttp}/matches/v2/",
-                        MyDraft: string.IsNullOrEmpty(auth) ? "" : $"{addressHttp}/draft/{auth["Bearer ".Length..]}",
-                        MyItems: string.IsNullOrEmpty(auth) ? "" : $"{addressHttp}/items/{auth["Bearer ".Length..]}",
-                        MyPlayer: string.IsNullOrEmpty(auth) ? "" : $"{addressHttp}/players/{auth["Bearer ".Length..]}",
-                        Players: $"{addressHttp}/players",
-                        Purchase: $"{addressHttp}/store/v2/txn",
-                        Root: addressHttp,
-                        Session: $"{addressHttp}/session",
-                        Store: $"{addressHttp}/store/",
-                        Tourneys: $"{addressHttp}/tourney/",
-                        Transactions: $"{addressHttp}/store/txn",
-                        ViewOffers: $"{addressHttp}/store/v2/"
-                    )
-                );
-
-                return Results.Ok(config1);
+                return Results.Ok(config.appconfig.getConfig(auth));
             });// 3. 玩家管理
             app.MapPost("/players/{player_id}/friends", async (HttpContext context, dynamic body) =>
             {
@@ -289,7 +254,7 @@ namespace fyserver
                     if (tag == 0 && !string.IsNullOrEmpty(name))
                     {
                         user.Name = name;
-                        await config.appconfig.users.SaveUserAsync(user);
+                        await GlobalState.users.SaveUserAsync(user);
                     }
                 }
 
@@ -309,16 +274,16 @@ namespace fyserver
 
             app.MapPost("/players/{id}/decks", async (string id, CreateDeck createDeck) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 var deck = new Deck(createDeck, user.Id);
                 user.Decks[deck.Id] = deck;
 
-                await config.appconfig.users.SaveUserAsync(user);
+                await GlobalState.users.SaveUserAsync(user);
 
                 return Results.Ok(new
                 {
@@ -338,11 +303,11 @@ namespace fyserver
 
             app.MapPut("/players/{player_id}/decks/{deck_id}", async (string player_id, int deck_id, Action action) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(player_id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(player_id));
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 if (user.Decks.TryGetValue(deck_id, out var deck))
                 {
@@ -354,7 +319,7 @@ namespace fyserver
                             break;
                     }
 
-                    await config.appconfig.users.SaveUserAsync(user);
+                    await GlobalState.users.SaveUserAsync(user);
                 }
 
                 return Results.Ok(new { });
@@ -362,11 +327,11 @@ namespace fyserver
 
             app.MapPut("/players/{player_id}/decks/", async (string player_id, ChangeDeck changeDeck) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(player_id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(player_id));
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 if (user.Decks.TryGetValue(changeDeck.Id, out var deck))
                 {
@@ -382,7 +347,7 @@ namespace fyserver
                             break;
                     }
 
-                    await config.appconfig.users.SaveUserAsync(user);
+                    await GlobalState.users.SaveUserAsync(user);
                 }
 
                 return Results.Ok(new { });
@@ -390,14 +355,14 @@ namespace fyserver
 
             app.MapDelete("/players/{player_id}/decks/{deck_id}", async (string player_id, int deck_id) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(player_id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(player_id));
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 user.Decks.Remove(deck_id);
-                await config.appconfig.users.SaveUserAsync(user);
+                await GlobalState.users.SaveUserAsync(user);
 
                 return Results.Ok(new { });
             });
@@ -405,16 +370,16 @@ namespace fyserver
             // 5. 物品装备
             app.MapGet("/items/{id}", async (string id) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 if (user.Items == null || user.Items.Count == 0)
                 {
                     user.Items = a.Items.ToList();
-                    await config.appconfig.users.SaveUserAsync(user);
+                    await GlobalState.users.SaveUserAsync(user);
                 }
 
                 var response = new ItemsResponse(
@@ -427,11 +392,11 @@ namespace fyserver
 
             app.MapPost("/items/{id}", async (string id, Item item) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(int.Parse(id));
+                var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 if (user.EquippedItem == null)
                     user.EquippedItem = new List<Item>();
@@ -441,14 +406,14 @@ namespace fyserver
                 // 添加新装备
                 user.EquippedItem.Add(item);
 
-                await config.appconfig.users.SaveUserAsync(user);
+                await GlobalState.users.SaveUserAsync(user);
 
                 return Results.Ok(item);
             });
             // 6. 匹配系统
            app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(lobbyPlayer.PlayerId);
+                var user = await GlobalState.users.GetByIdAsync(lobbyPlayer.PlayerId);
                 if (user == null || user.Name == "<anon>")
                 {
                     // TODO: WebSocket断开连接消息
@@ -456,7 +421,7 @@ namespace fyserver
                     return Results.BadRequest("请改名");
                 }
 
-                user.UserStore = config.appconfig.users;
+                user.UserStore = GlobalState.users;
 
                 // 检查卡组有效性（简化）
                 if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
@@ -564,12 +529,12 @@ namespace fyserver
                     return Results.NotFound($"Match with ID {id} not found");
 
                 // 反作弊检查
-                if (config.appconfig.banchaeat && matchAction.ActionType == GameConstants.XActionCheat)
+                if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    user.UserStore = config.appconfig.users;
-                    await config.appconfig.users.SaveUserAsync(user);
+                    user.UserStore = GlobalState.users;
+                    await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
                 }
@@ -675,12 +640,12 @@ namespace fyserver
                     return Results.NotFound($"Match with ID {id} not found");
 
                 // 反作弊检查
-                if (config.appconfig.banchaeat && matchAction.ActionType == GameConstants.XActionCheat)
+                if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    user.UserStore = config.appconfig.users;
-                    await config.appconfig.users.SaveUserAsync(user);
+                    user.UserStore = GlobalState.users;
+                    await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
                 }
@@ -824,16 +789,16 @@ namespace fyserver
             });
 
             // 10. 管理API端点
-            app.MapGet("/admin/users/count", async () =>
+            app.MapGet("/admin/GlobalState.users/count", async () =>
             {
-                var users = await config.appconfig.users.GetAllUsersAsync();
+                var users= await GlobalState.users.GetAllUsersAsync();
                 return Results.Ok(new { count = users.Count });
             });
 
             app.MapGet("/admin/users/list", async () =>
             {
-                var users = await config.appconfig.users.GetAllUsersAsync();
-                var simplifiedUsers = users.Select(u => new
+                var Users = await GlobalState.users.GetAllUsersAsync();
+                var simplifiedUsers =Users.Select(u => new
                 {
                     u.Id,
                     u.UserName,
@@ -847,37 +812,37 @@ namespace fyserver
                 return Results.Ok(simplifiedUsers);
             });
 
-            app.MapDelete("/admin/users/{userId}", async (int userId) =>
+            app.MapDelete("/admin/GlobalState.users/{userId}", async (int userId) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(userId);
+                var user = await GlobalState.users.GetByIdAsync(userId);
                 if (user == null)
                     return Results.NotFound($"User with ID {userId} not found");
 
-                await config.appconfig.users.DeleteUserAsync(userId);
+                await GlobalState.users.DeleteUserAsync(userId);
                 return Results.Ok(new { message = $"User {userId} deleted successfully" });
             });
 
-            app.MapPost("/admin/users/{userId}/ban", async (int userId) =>
+            app.MapPost("/admin/GlobalState.users/{userId}/ban", async (int userId) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(userId);
+                var user = await GlobalState.users.GetByIdAsync(userId);
                 if (user == null)
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = true;
-                user.UserStore = config.appconfig.users;
-                await config.appconfig.users.SaveUserAsync(user);
+                user.UserStore = GlobalState.users;
+                await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} banned successfully" });
             });
 
-            app.MapPost("/admin/users/{userId}/unban", async (int userId) =>
+            app.MapPost("/admin/GlobalState.users/{userId}/unban", async (int userId) =>
             {
-                var user = await config.appconfig.users.GetByIdAsync(userId);
+                var user = await GlobalState.users.GetByIdAsync(userId);
                 if (user == null)
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = false;
-                user.UserStore = config.appconfig.users;
-                await config.appconfig.users.SaveUserAsync(user);
+                user.UserStore = GlobalState.users;
+                await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} unbanned successfully" });
             });
 
@@ -915,15 +880,15 @@ namespace fyserver
             // 数据库初始化和清理
             app.Lifetime.ApplicationStarted.Register(() =>
             {
-                Console.WriteLine($"Application started on http://localhost:{config.appconfig.portHttp}");
-                Console.WriteLine($"RocksDB database initialized at ./db/users.db");
+                Console.WriteLine($"Application started on {config.appconfig.getAddressHttp()}");
+                Console.WriteLine($"RocksDB database initialized at ./db/GlobalState.users.db");
             });
 
             app.Lifetime.ApplicationStopping.Register(() =>
             {
                 Console.WriteLine("Application stopping. Cleaning up...");
                 // 清理数据库资源
-                config.appconfig.users.Dispose();
+                GlobalState.users.Dispose();
             });
 
             //Console.WriteLine(app.Map);

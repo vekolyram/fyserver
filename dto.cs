@@ -209,7 +209,7 @@ namespace fyserver
     );
 
     public record Config(
-        CurrentUser CurrentUser,
+        List<CurrentUser> current_user,
         Endpoints Endpoints
     );
 
@@ -448,12 +448,12 @@ namespace fyserver
         // 从数据库加载用户
         public static async Task<User?> LoadAsync(string userName)
         {
-            return await config.appconfig.users.GetByUserNameAsync(userName);
+            return await GlobalState.users.GetByUserNameAsync(userName);
         }
 
         public static async Task<User?> LoadAsync(int userId)
         {
-            return await config.appconfig.users.GetByIdAsync(userId);
+            return await GlobalState.users.GetByIdAsync(userId);
         }
 
         // 删除用户
@@ -465,7 +465,7 @@ namespace fyserver
             }
             else
             {
-                await config.appconfig.users.DeleteUserAsync(Id);
+                await GlobalState.users.DeleteUserAsync(Id);
             }
         }
     }
