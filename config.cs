@@ -1,5 +1,6 @@
-﻿using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 namespace fyserver
 {
     public class config
@@ -7,7 +8,10 @@ namespace fyserver
         public int portWs=5232;
         public int portHttp = 5231;
         public bool banchaeat = false;
-        public static config appconfig { get; }=new config();
+        public Random rand=new Random();
+        public RocksDbKV users = new RocksDbKV(@"users.db");
+        public List<KeyValuePair<User, string>>? clients;
+public static config appconfig { get; }=new config();
         public void read() {
             if (File.Exists("./setting.json"))
             {
@@ -19,6 +23,7 @@ namespace fyserver
             }
             else
             {
+                
                 write();
             }
         }

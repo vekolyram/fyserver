@@ -25,8 +25,7 @@ namespace fyserver
                 if (context.WebSockets.IsWebSocketRequest)
                 {
                     using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-
-                    await Echo(webSocket);
+                    Response(webSocket,context);
                 }
                 else
                 {
@@ -50,22 +49,30 @@ namespace fyserver
             WebSocketReceiveResult result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             callback(ref buffer, in result);
         }
-        private static async Task Echo(WebSocket webSocket)
+        private static async Task Response(WebSocket webSocket,HttpContext context)
         {
-            var buffer = new byte[1024];
-            var receiveResult = await webSocket.ReceiveAsync(
-            new ArraySegment<byte>(buffer), CancellationToken.None);
+            var buffer = new byte[1024*4];
+            var receiveResult = await webSocket.ReceiveAsync( new ArraySegment<byte>(buffer), CancellationToken.None);
+            if (receiveResult.MessageType == WebSocketMessageType.Close)
+            {
+                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure,
+                    "客户端请求关闭", CancellationToken.None);
+                webSocket.Dispose();
+                return;
+            }
             string receivedMessage = Encoding.UTF8.GetString(buffer, 0, receiveResult.Count);
+            msg msg1=new msg();
             try
             {
-                msg msg1 = (JsonConvert.DeserializeObject<msg>(receivedMessage));
-                Console.WriteLine(msg1.channel);
-                buffer = Encoding.UTF8.GetBytes("pong");
+                msg1 = (JsonConvert.DeserializeObject<msg>(receivedMessage));
             }
             catch
             {
                 Console.WriteLine("fuck");
             }
+            
+            config.appconfig.users.Get(context.Request.Headers["authorization"].ToString()[4..]);
+                buffer = Encoding.UTF8.GetBytes("pong");
             await webSocket.SendAsync(
                 new ArraySegment<byte>(buffer, 0, buffer.Length),
                 receiveResult.MessageType,
