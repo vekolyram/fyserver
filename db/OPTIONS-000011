@@ -60,7 +60,7 @@
   write_thread_slow_yield_usec=3
   db_log_dir=
   unordered_write=false
-  wal_dir=users.db
+  wal_dir=db
   max_subcompactions=1
   WAL_size_limit_MB=0
   max_total_wal_size=0
