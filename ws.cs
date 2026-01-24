@@ -67,7 +67,7 @@ namespace fyserver
                 Console.WriteLine("fuck");
             }
             await webSocket.SendAsync(
-                new ArraySegment<byte>(Encoding.UTF8.GetBytes("pong"), 0, buffer.Length),
+                new ArraySegment<byte>(buffer, 0, buffer.Length),
                 receiveResult.MessageType,
                 receiveResult.EndOfMessage,
                 CancellationToken.None);
