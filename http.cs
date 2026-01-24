@@ -4,7 +4,7 @@ namespace fyserver
     public class http
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
-        public void StartHttpServer()
+        async public Task StartHttpServer()
         {
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls("http://localhost" + ":" + config.appconfig.portHttp);
@@ -14,28 +14,18 @@ namespace fyserver
             {
                 app.MapOpenApi();
             }
-            var summaries = new[]
-            {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-            app.MapGet("/weatherforecast", () =>
-            {
-                var forecast = Enumerable.Range(1, 5).Select(index =>
-                    new WeatherForecast
-                    (
-                        DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                        Random.Shared.Next(-20, 55),
-                        summaries[Random.Shared.Next(summaries.Length)]
-                    ))
-                    .ToArray();
-                return forecast;
-            })
-            .WithName("GetWeatherForecast");
-            app.Run();
-        }
-        internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-        {
-            public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+            app.MapGet("/hello", () => "Hello named route")
+               .WithName("hi");
+
+            app.MapGet("/", (LinkGenerator linker) =>
+                    $"The link to the hello route is {linker.GetPathByName("hi", values: null)}");
+            app.MapGet("/users/{userId}/books/{bookId}",
+    (int userId, int bookId) => $"The user id is {userId} and book id is {bookId}");
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("正在启动http服务器");
+            Console.ForegroundColor = ConsoleColor.White;
+            await app.RunAsync();
+
         }
     }
 }

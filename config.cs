@@ -4,8 +4,8 @@ namespace fyserver
 {
     public class config
     {
-        public int portWs=5231;
-        public int portHttp = 5232;
+        public int portWs=5232;
+        public int portHttp = 5231;
         public bool banchaeat = false;
         public static config appconfig { get; }=new config();
         public void read() {
