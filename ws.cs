@@ -1,7 +1,5 @@
 ﻿using Fleck;
-using Newtonsoft.Json;
 using System.Net.WebSockets;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace fyserver
@@ -12,7 +10,7 @@ namespace fyserver
         public async Task StartWsServerAsync()
         {
             var server = new WebSocketServer(config.appconfig.getAddressWs());
-            server.RestartAfterListenError=true;
+            server.RestartAfterListenError = true;
             FleckLog.Level = Fleck.LogLevel.Debug;
             // 调用 server 实例的 Start 方法启动服务器。
             // Start 方法接受一个 lambda 表达式作为参数，该表达式定义了如何处理新的 WebSocket 连接。
@@ -22,31 +20,34 @@ namespace fyserver
             server.Start(socket =>
             {
                 // 当 WebSocket 连接打开时，触发 OnOpen 事件，并输出 "Open!" 到控制台。
-                socket.OnOpen = () => {
-                
+                socket.OnOpen = () =>
+                {
+
                 };
                 // 当 WebSocket 连接关闭时，触发 OnClose 事件，并输出 "Close!" 到控制台。
                 socket.OnClose = () => Console.WriteLine("Close!");
                 // 当服务器接收到来自客户端的消息时，触发 OnMessage 事件。
                 // 这个事件的处理程序接收一个参数 message，它包含了从客户端接收到的消息。
                 // 然后，使用 socket.Send 方法将接收到的消息发送回客户端。
-                socket.OnMessage = message => Response(socket);
+                socket.OnMessage = message => Response(socket,message);
             });
         }
-    
-public static async Task SendString(WebSocket ws, string s)
+
+        public static async Task SendString(WebSocket ws, string s)
         {
             byte[] messageBuffer = Encoding.UTF8.GetBytes(s);
             await ws.SendAsync(new ArraySegment<byte>(messageBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
         }
-public delegate void Processor<T>(ref T item, in WebSocketReceiveResult result);
-    public static async Task ProcessBytes(WebSocket ws, byte[] buffer, Processor<byte[]> callback)
-    {
-        await ws.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
-        WebSocketReceiveResult result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-        callback(ref buffer, in result);
-    }
-        public static async Task Response(IWebSocketConnection sk) {
+        public delegate void Processor<T>(ref T item, in WebSocketReceiveResult result);
+        public static async Task ProcessBytes(WebSocket ws, byte[] buffer, Processor<byte[]> callback)
+        {
+            await ws.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            WebSocketReceiveResult result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+            callback(ref buffer, in result);
+        }
+        public static async Task Response(IWebSocketConnection sk,string msg)
+        {
+
             Console.WriteLine(sk.ConnectionInfo.Headers.Count);
         }
     }

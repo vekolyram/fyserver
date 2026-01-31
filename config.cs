@@ -15,7 +15,7 @@ namespace fyserver
         public int portWs=5232;
         public int portHttp = 5231;
         public bool bancheat = false;
-        public Random rand=new Random();
+        //public Random rand=new();
         public ConcurrentBag<User> clients =[];
         public List<LobbyPlayer> WaitingPlayers1 = [];
         public List<LobbyPlayer> WaitingPlayers2 = [];
@@ -25,7 +25,7 @@ namespace fyserver
         public string ip="0.0.0.0";
         //public List<KeyValuePair<User, string>>? clients;
         public string getAddressWs() {
-            return "ws://0.0.0.0:" + portWs.ToString();
+            return "ws://127.0.0.1:" + portWs.ToString();
         }
         public string getAddressWsR()
         {
@@ -41,7 +41,7 @@ namespace fyserver
         }
         public Config getConfig(string auth) {
             var config1 = new Config(
-                       current_user: string.IsNullOrEmpty(auth) ? null : new List<CurrentUser> {
+                       CurrentUser: string.IsNullOrEmpty(auth) ? null :
                            new CurrentUser(
                            ClientId: 0,
                            Exp: 0,
@@ -59,7 +59,7 @@ namespace fyserver
                            UserId: int.Parse(auth["Bearer ".Length..]),
                            UserName: auth["Bearer ".Length..]
                            )
-                       },
+                       ,
                        Endpoints: new Endpoints(
                            Draft: $"{config.appconfig.getAddressHttpR()}/draft/",
                            Email: $"{getAddressHttpR()}/email/set",
@@ -81,7 +81,8 @@ namespace fyserver
             return config1;
         }
         public static config appconfig { get; }=new config();
-        public void read() {
+        public void read()
+        {
             if (File.Exists("./setting.json"))
             {
                 String file = File.ReadAllText("./setting.json");
@@ -93,40 +94,8 @@ namespace fyserver
             }
             else
             {
-                
+
                 write();
-            }
-        }
-        public class SnakeCaseNamingPolicy : JsonNamingPolicy
-        {
-            public override string ConvertName(string name)
-            {
-                if (string.IsNullOrEmpty(name))
-                    return name;
-
-                var chars = name.ToCharArray();
-                var result = new List<char>();
-
-                for (int i = 0; i < chars.Length; i++)
-                {
-                    if (i > 0 && char.IsUpper(chars[i]))
-                    {
-                        // 如果当前字符是大写，且前一个字符不是大写，则添加下划线
-                        if (!char.IsUpper(chars[i - 1]))
-                        {
-                            result.Add('_');
-                        }
-                        // 如果当前字符是大写，且前一个字符是大写但下一个字符是小写（或没有字符），则添加下划线
-                        else if (i < chars.Length - 1 && char.IsLower(chars[i + 1]))
-                        {
-                            result.Add('_');
-                        }
-                    }
-
-                    result.Add(char.ToLowerInvariant(chars[i]));
-                }
-
-                return new string(result.ToArray());
             }
         }
         public void write() {

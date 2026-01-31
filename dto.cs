@@ -209,7 +209,7 @@ namespace fyserver
     );
 
     public record Config(
-        List<CurrentUser> current_user,
+        CurrentUser CurrentUser,
         Endpoints Endpoints
     );
 
