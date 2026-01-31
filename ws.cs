@@ -47,8 +47,7 @@ namespace fyserver
         }
         public static async Task Response(IWebSocketConnection sk,string msg)
         {
-
-            Console.WriteLine(sk.ConnectionInfo.Headers.Count);
+            Console.WriteLine(msg);
         }
     }
 }

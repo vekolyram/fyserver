@@ -1,7 +1,11 @@
 ﻿
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
+using System;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using static fyserver.config;
@@ -81,7 +85,7 @@ namespace fyserver
                     {
                         user = await GlobalState.users.CreateUserAsync(session.Username);
                     }
-                    catch (InvalidOperationException ex)
+                    catch (Exception ex)
                     {
                         // 用户已存在或其他错误
                         return Results.BadRequest(ex.Message);
@@ -100,7 +104,7 @@ namespace fyserver
                     );
                 }
                 // 设置用户存储服务
-                user.UserStore = GlobalState.users;
+                //user.UserStore = GlobalState.users;
                 var response = new SessionResponse(
                     AchievementsUrl: $"{addressHttp}/players/{user.Id}/achievements",
                     AllKnockoutTourneys: new List<object>(),
@@ -237,30 +241,64 @@ namespace fyserver
                 var auth = context.Request.Headers["Authorization"].FirstOrDefault();
                 return Results.Ok(config.appconfig.getConfig(auth));
             });// 3. 玩家管理
-            app.MapPost("/players/{player_id}/friends", async (HttpContext context, dynamic body) =>
+            //TODO: 完善entitlements接口,用于处理所有权
+            app.MapGet("/entitlements/{id}", (HttpContext context) =>
             {
-                var user = await GetUserFromAuthAsync(context);
-                if (user == null)
-                    return Results.Unauthorized();
-
-                // 解析请求体
-                var dict = body as IDictionary<string, object>;
-                if (dict != null && dict.TryGetValue("friend_tag", out var friendTag) &&
-                    dict.TryGetValue("friend_name", out var friendName))
-                {
-                    var tag = Convert.ToInt32(friendTag);
-                    var name = friendName?.ToString();
-
-                    if (tag == 0 && !string.IsNullOrEmpty(name))
-                    {
-                        user.Name = name;
-                        await GlobalState.users.SaveUserAsync(user);
-                    }
-                }
-
-                return Results.Ok("OK");
+                List<Entitlement> e = new();
+                e.Add(new Entitlement
+                (
+                    EntitlementType : "emote",
+                    Name : "emote_appreciate"
+                )); 
+                return Results.Ok(e);
             });
+            //TODO: 完善fp接口,用于处理商店
+            app.MapGet("/fp/", (HttpContext context) =>
+            {
+            });
+            //TODO：http://kards.live.1939api.com//store/v2/?provider=xsolla HTTP/1.1，用于处理商店
+            //
+            //
 
+            //app.MapPost("/players/{player_id}/friends", async (HttpContext context, dynamic body) =>
+            //{
+            //    var user = await GetUserFromAuthAsync(context);
+            //    if (user == null)
+            //        return Results.Unauthorized();
+
+            //    // 解析请求体
+            //    var dict = body as IDictionary<string, object>;
+            //    if (dict != null && dict.TryGetValue("friend_tag", out var friendTag) &&
+            //        dict.TryGetValue("friend_name", out var friendName))
+            //    {
+            //        var tag = Convert.ToInt32(friendTag);
+            //        var name = friendName?.ToString();
+
+            //        if (tag == 0 && !string.IsNullOrEmpty(name))
+            //        {
+            //            user.Name = name;
+            //            await GlobalState.users.SaveUserAsync(user);
+            //        }
+            //    }
+
+            //    return Results.Ok("OK");
+            //});
+            app.Use(async (context, next) =>
+            {
+                // 在处理请求之前或之后添加
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers["Content-Type"] = context.Response.Headers["Content-Type"].ToString().Replace("; charset=utf-8", "");
+                    return Task.CompletedTask;
+                });
+
+                await next();
+            });
+            app.MapGet("/players/{player_id}/friends", async (HttpContext context) =>
+            {
+                List<int> nil = new();
+                return Results.Ok(new FriendsReponse(Friends:nil,PreviousOpponents:nil));
+            });
             app.MapMethods("/players/{id}/heartbeat", new[] { "PUT", "DELETE" }, (string id) =>
             {
                 return Results.Ok(new { });
@@ -383,6 +421,7 @@ namespace fyserver
                 }
 
                 var response = new ItemsResponse(
+                    
                     EquippedItems: user.EquippedItem,
                     Items: user.Items
                 );
@@ -629,7 +668,10 @@ namespace fyserver
 
                 return Results.Ok(result);
             });
-
+            app.MapGet("/config", (HttpContext context) =>
+            {
+                return Results.Ok(new CloseConfig(XserverClosed:"路几把"));
+            });// 3. 玩家管理
             app.MapPost("/matches/v2/{id}/actions", async (int id, MatchAction matchAction, HttpContext context) =>
             {
                 var user = await GetUserFromAuthAsync(context);
@@ -779,13 +821,6 @@ namespace fyserver
                 }
 
                 return Results.NotFound();
-            });
-
-            // 9. WebSocket端点（TODO）
-            app.MapGet("/ws", async (HttpContext context) =>
-            {
-                // TODO: WebSocket实现
-                return Results.BadRequest("WebSocket not implemented yet");
             });
 
             // 10. 管理API端点

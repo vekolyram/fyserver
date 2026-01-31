@@ -152,10 +152,13 @@ namespace fyserver
         string Value,
         string DeckCode
     );
-
+    public record ProviderDetail(
+        string PaymentProvider
+    );
     // Session DTOs as records
     public record Session(
         string Provider,
+        ProviderDetail ProviderDetails,
         string ClientType,
         string Build,
         string PlatformType,
@@ -165,11 +168,18 @@ namespace fyserver
         string PlatformVersion,
         string AccountLinking,
         string Language,
-        string AutomaticAccountCreation,
+        bool AutomaticAccountCreation,
         string Username,
         string Password
     );
-
+    public record Entitlement(
+    string EntitlementType,
+    string Name
+  );
+    public record FriendsReponse(
+            List<int> Friends,
+            List<int> PreviousOpponents
+        );
     // Config records
     public record CurrentUser(
         int ClientId,
@@ -188,7 +198,11 @@ namespace fyserver
         int UserId,
         string UserName
     );
-
+    public record CloseConfig(
+       string XserverClosed="",
+        string XserverClosedHeader = "Server maintenance",
+        string ForgotPasswordUrl = "https://pornhub.com"
+    );
     public record Endpoints(
         string Draft,
         string Email,

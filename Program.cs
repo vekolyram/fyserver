@@ -11,7 +11,7 @@ new ws().StartWsServerAsync();
 ClientWebSocket webSocket = new ClientWebSocket();
 await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs()), CancellationToken.None);
 string message = JsonConvert.SerializeObject(new msg() { message = "", channel = "ping" });
-    ws.SendString(webSocket, message);
+ws.SendString(webSocket, message);
 var buffer = new byte[1024];
 List<byte> bs = new List<byte>();
 WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
