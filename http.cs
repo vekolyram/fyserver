@@ -68,7 +68,7 @@ namespace fyserver
             // 1. 会话管理
             app.MapPost("/session", async (Session session) =>
             {
-                string addressHttp = config.appconfig.getAddressHttp();
+                string addressHttp = config.appconfig.getAddressHttpR();
                 User? user = null;
                 try
                 {
@@ -105,7 +105,7 @@ namespace fyserver
                     );
                 }
                 // 设置用户存储服务
-                //user.UserStore = GlobalState.users;
+                //
                 var response = new SessionResponse(
                     AchievementsUrl: $"{addressHttp}/players/{user.Id}/achievements",
                     AllKnockoutTourneys: new List<object>(),
@@ -156,7 +156,7 @@ namespace fyserver
                     JapanLevelClaimed: 500,
                     JapanXp: 0,
                     Jti: "1",
-                    Jwt: $"todo{session.Username}",
+                    Jwt: $"{session.Username}",
                     LastCrateClaimedDate: "2025-07-02T11:24:15.567042Z",
                     LastDailyMissionCancel: null,
                     LastDailyMissionRenewal: "2025-07-05T15:21:43.653915Z",
@@ -222,17 +222,14 @@ namespace fyserver
                 return Results.Ok(response);
             });
 
+            // 在 http.cs 中
             async Task<User?> GetUserFromAuthAsync(HttpContext context)
             {
                 var playerId = GetPlayerIdFromAuth(context);
                 if (playerId > 0)
                 {
-                    var user = await GlobalState.users.GetByIdAsync(playerId);
-                    if (user != null)
-                    {
-                        user.UserStore = GlobalState.users;
-                    }
-                    return user;
+                    // 纯粹的数据获取，不需要注入 UserStore
+                    return await GlobalState.users.GetByIdAsync(playerId);
                 }
                 return null;
             }
@@ -260,30 +257,6 @@ namespace fyserver
             //TODO：http://kards.live.1939api.com//store/v2/?provider=xsolla HTTP/1.1，用于处理商店
             //
             //
-
-            //app.MapPost("/players/{player_id}/friends", async (HttpContext context, dynamic body) =>
-            //{
-            //    var user = await GetUserFromAuthAsync(context);
-            //    if (user == null)
-            //        return Results.Unauthorized();
-
-            //    // 解析请求体
-            //    var dict = body as IDictionary<string, object>;
-            //    if (dict != null && dict.TryGetValue("friend_tag", out var friendTag) &&
-            //        dict.TryGetValue("friend_name", out var friendName))
-            //    {
-            //        var tag = Convert.ToInt32(friendTag);
-            //        var name = friendName?.ToString();
-
-            //        if (tag == 0 && !string.IsNullOrEmpty(name))
-            //        {
-            //            user.Name = name;
-            //            await GlobalState.users.SaveUserAsync(user);
-            //        }
-            //    }
-
-            //    return Results.Ok("OK");
-            //});
             app.Use(async (context, next) =>
             {
                 // 在处理请求之前或之后添加
@@ -317,7 +290,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 var deck = new Deck(createDeck, user.Id);
                 user.Decks[deck.Id] = deck;
@@ -346,7 +319,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 if (user.Decks.TryGetValue(deck_id, out var deck))
                 {
@@ -370,7 +343,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 if (user.Decks.TryGetValue(changeDeck.Id, out var deck))
                 {
@@ -398,7 +371,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 user.Decks.Remove(deck_id);
                 await GlobalState.users.SaveUserAsync(user);
@@ -413,7 +386,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 if (user.Items == null || user.Items.Count == 0)
                 {
@@ -436,7 +409,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                user.UserStore = GlobalState.users;
+                
 
                 if (user.EquippedItem == null)
                     user.EquippedItem = new List<Item>();
@@ -461,7 +434,7 @@ namespace fyserver
                     return Results.BadRequest("请改名");
                 }
 
-                user.UserStore = GlobalState.users;
+                
 
                 // 检查卡组有效性（简化）
                 if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
@@ -573,7 +546,7 @@ namespace fyserver
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    user.UserStore = GlobalState.users;
+                    
                     await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
@@ -687,7 +660,7 @@ namespace fyserver
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    user.UserStore = GlobalState.users;
+                    
                     await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
@@ -865,7 +838,7 @@ namespace fyserver
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = true;
-                user.UserStore = GlobalState.users;
+                
                 await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} banned successfully" });
             });
@@ -877,7 +850,7 @@ namespace fyserver
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = false;
-                user.UserStore = GlobalState.users;
+                
                 await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} unbanned successfully" });
             });

@@ -51,11 +51,11 @@ namespace fyserver
                            Jti: "",
                            Language: "en",
                            Payment: "notavailable",
-                           PlayerId: int.Parse(auth["Bearer ".Length..]),
+                           PlayerId: auth["Bearer ".Length..],
                            Provider: "device",
                            Roles: new List<string>(),
                            Tier: "LIVE",
-                           UserId: int.Parse(auth["Bearer ".Length..]),
+                           UserId: GlobalState.users.GetByUserNameAsync(?).Id,
                            UserName: auth["Bearer ".Length..]
                            )
                        ,

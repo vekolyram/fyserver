@@ -2,25 +2,26 @@
 
 namespace fyserver
 {
-    public class a{
-    public static readonly LibraryResponse Library = new(
-        new List<LibraryItem>
-        {
+    public class a
+    {
+        public static readonly LibraryResponse Library = new(
+            new List<LibraryItem>
+            {
             new("card_unit_seahawk", 4, 5, 2001, 0)
-        },
-        new List<object>()
-    );
+            },
+            new List<object>()
+        );
 
-    public static readonly List<Item> Items = new()
+        public static readonly List<Item> Items = new()
     {
         new Item("", "cardback_yokoshiba", "")
     };
 
-    public static readonly Dictionary<string, CardLookup> DeckCodeTable = new()
+        public static readonly Dictionary<string, CardLookup> DeckCodeTable = new()
     {
         { "v7", new CardLookup("card_unit_1st_airborne", "v7", 2001) }
     };
-}
+    }
     public record msg
     {
         public string match_id = "";
@@ -191,7 +192,7 @@ namespace fyserver
         string Jti,
         string Language,
         string Payment,
-        int PlayerId,
+        string PlayerId,
         string Provider,
         List<string> Roles,
         string Tier,
@@ -199,7 +200,7 @@ namespace fyserver
         string UserName
     );
     public record CloseConfig(
-       string XserverClosed="",
+       string XserverClosed = "",
         string XserverClosedHeader = "Server maintenance",
         string ForgotPasswordUrl = "https://pornhub.com"
     );
@@ -286,51 +287,46 @@ namespace fyserver
         System.Net.WebSockets.WebSocket Client
     );
     // UserStoreService.cs
-public class UserStoreService : IDisposable
+    public class UserStoreService : IDisposable
     {
         private readonly LiteDbService _db;
-        // 如果是依赖注入单例模式，不需要自己在内部 Dispose；
-        // 如果是自己 new 出来的，则需要 Dispose。
         private readonly bool _ownsConnection;
 
-        // 选项 A: 构造函数注入 (推荐，用于 ASP.NET Core)
+        // 构造函数保持不变...
         public UserStoreService(LiteDbService dbService)
         {
             _db = dbService;
             _ownsConnection = false;
         }
 
-        // 选项 B: 默认构造函数 (用于简单迁移 / 控制台应用)
         public UserStoreService() : this(new LiteDbService("Filename=./db/users.db;Connection=Shared"))
         {
             _ownsConnection = true;
         }
 
-        // 通过用户名获取用户
-        // 对应 TS: users.get (auth.slice (8)) 或 users.get (session.username)
         public async Task<User?> GetByUserNameAsync(string userName)
         {
             if (string.IsNullOrWhiteSpace(userName)) return null;
             return await _db.GetAsync<User>($"user:username:{userName}");
         }
 
-        // 通过 ID 获取用户
-        // 对应 TS: users.get ("" + lobbyPlayer.player_id)
         public async Task<User?> GetByIdAsync(int userId)
         {
             if (userId <= 0) return null;
             return await _db.GetAsync<User>($"user:id:{userId}");
         }
 
-        // 保存用户 (核心逻辑)
-        // 对应 TS: User.prototype.store ()
+        // 核心保存逻辑
         public async Task SaveUserAsync(User user)
         {
             if (string.IsNullOrEmpty(user.UserName) || user.Id == 0)
                 throw new ArgumentException("Invalid user data: Missing UserName or ID");
 
-            // 模拟 LevelDB 的行为：数据冗余存储两份，以便可以通过两种方式快速查找
-            // 使用 BatchAsync 确保两个 Key 的更新是原子的
+            // 更新修改时间
+            user.UpdatedAt = DateTime.UtcNow;
+
+            // 模拟 LevelDB 的双重索引 (冗余存储)
+            // LiteDB 的 Batch 操作保证了原子性：要么都成功，要么都失败
             var puts = new Dictionary<string, object>
             {
                 [$"user:username:{user.UserName}"] = user,
@@ -340,81 +336,57 @@ public class UserStoreService : IDisposable
             await _db.BatchAsync(puts);
         }
 
-        // 创建新用户
-        // 对应 TS: session.service.ts 中 user = new User (...) logic
+        // 创建用户：处理 ID 生成和冲突
         public async Task<User> CreateUserAsync(string userName)
         {
-            // 1. 检查是否存在
+            // 1. 检查用户名是否存在
             var existingUser = await GetByUserNameAsync(userName);
             if (existingUser != null)
             {
-                // 在原逻辑中，如果是 Session 获取时发现存在会直接返回，
-                // 这里如果是显式 Create，抛出异常是合理的。
-                throw new InvalidOperationException($"User with username '{userName}' already exists");
+                // 如果是幂等设计，可以直接返回旧用户；如果是严格创建，抛异常
+                // 这里为了安全起见，如果不慎重复调用，返回已存在的
+                return existingUser;
+                // 或者: throw new InvalidOperationException ($"User '{userName}' already exists");
             }
-
-            // 2. 实例化 (假设 User 构造函数里生成了随机 ID，参考 TS User 类)
             var user = new User(userName);
-
-            // 3. 再次检查 ID 是否冲突 (虽然概率极低，但 TS 原逻辑是随机数)
-            // 如果你的 User 构造函数没有生成 ID，在这里手动生成：
-            if (user.Id == 0)
+            // 2. 生成唯一 ID (带冲突重试)
+            // 原 TS 逻辑: Math.floor (Math.random () * 900000) + 100000;
+            var rnd = Random.Shared;
+            int newId;
+            bool idExists;
+            do
             {
-                // 简单的随机 ID 生成，对应 TS: Math.floor (Math.random () * 900000) + 100000;
-                user.Id = new Random().Next(100000, 1000000);
-            }
+                newId = rnd.Next(100000, 1000000); // 100k - 999k
+                                                   // 必须检查 ID 是否被占用
+                idExists = await _db.ExistsAsync($"user:id:{newId}");
+            } while (idExists);
 
-            // 4. 保存
+            user.Id = newId;
+
+            // 3. 保存
             await SaveUserAsync(user);
             return user;
         }
 
-        // 删除用户
-        // 对应 TS: 虽然原代码很少删除用户，但如果删除卡组等操作需要写回
         public async Task DeleteUserAsync(int userId)
         {
             var user = await GetByIdAsync(userId);
             if (user == null) return;
 
-            // 同时删除两个索引 Key
             var deletes = new List<string>
-        {
-            $"user:username:{user.UserName}",
-            $"user:id:{userId}"
-        };
+            {
+                $"user:username:{user.UserName}",
+                $"user:id:{userId}"
+            };
 
-            // 这里的 puts 为空，只执行 deletes
             await _db.BatchAsync(null, deletes);
         }
 
-        // 获取所有用户
-        // 性能警告：全量加载到内存。仅用于后台管理或初始化。
         public async Task<List<User>> GetAllUsersAsync()
         {
-            // 只需要按一种 Key 前缀获取，避免数据重复
+            // 只取一种 Key 前缀，防止数据重复
             return await _db.GetAllByPrefixAsync<User>("user:id:");
         }
-
-        // 搜索用户
-        public async Task<List<User>> SearchUsersAsync(string searchTerm)
-        {
-            // 由于 K-V 存储本身不支持模糊查询，这里必须先加载所有用户
-            // 在 LiteDB 原生模式下可以使用 SQL 语法，但为了兼容 K-V 接口层，只能在内存过滤
-            var allUsers = await GetAllUsersAsync();
-
-            if (string.IsNullOrWhiteSpace(searchTerm)) return allUsers;
-
-            return allUsers
-                .Where(u => (u.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                            (u.UserName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
-                .ToList();
-        }
-
-        public async Task<bool> UserExistsAsync(string userName)
-        {
-            return await _db.ExistsAsync($"user:username:{userName}");
-        }
-
         public void Dispose()
         {
             if (_ownsConnection)
@@ -426,24 +398,24 @@ public class UserStoreService : IDisposable
     // User.cs (更新版)
     public class User
     {
-        [JsonIgnore]
-        private UserStoreService? _userStore;
-
+        // 无参构造函数对 LiteDB 是必须的
         public User()
         {
-        }
-
-        public User(string userName)
-        {
-            Id = Random.Shared.Next(100000, 999999);
-            UserName = userName;
-            Name = "XDLG";
-            Tag = Random.Shared.Next(1000, 9999);
-            Locale = "zh-Hans";
+            // 初始化集合，防止空引用
             Decks = new Dictionary<int, Deck>();
             EquippedItem = new List<Item>();
             Items = new List<Item>();
+        }
+
+        public User(string userName) : this()
+        {
+            UserName = userName;
+            // 默认值
+            Name = "<anon>"; // 对应 TS: this.name = "<anon>";
+            Locale = "zh-Hans";
+            Tag = Random.Shared.Next(1000, 9999);
             Banned = false;
+            // ID 的生成移交给 Service 层处理，或者在这里暂存
         }
 
         public int Id { get; set; }
@@ -452,65 +424,16 @@ public class UserStoreService : IDisposable
         public string Locale { get; set; } = "";
         public int Tag { get; set; }
 
-        [JsonIgnore]
-        public Dictionary<int, Deck> Decks { get; set; } = new();
+        // 直接存储 Dictionary，LiteDB 支持。
+        // System.Text.Json 默认会将 int key 转为 string key ("1001": {...})，这通常是可以接受的。
+        public Dictionary<int, Deck> Decks { get; set; }
 
-        public List<Deck> DecksList
-        {
-            get => Decks.Values.ToList();
-            set
-            {
-                Decks = new Dictionary<int, Deck>();
-                foreach (var deck in value)
-                {
-                    Decks[deck.Id] = deck;
-                }
-            }
-        }
-
-        public List<Item> EquippedItem { get; set; } = new();
-        public List<Item> Items { get; set; } = new();
+        public List<Item> EquippedItem { get; set; }
+        public List<Item> Items { get; set; }
         public bool Banned { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-
-        // 设置用户存储服务（依赖注入）
-        [JsonIgnore]
-        public UserStoreService UserStore
-        {
-            set => _userStore = value;
-        }
-
-        // 保存用户到数据库
-        public async Task StoreAsync()
-        {
-            UpdatedAt = DateTime.UtcNow;
-                await _userStore.SaveUserAsync(this);
-        }
-
-        // 从数据库加载用户
-        public static async Task<User?> LoadAsync(string userName)
-        {
-            return await GlobalState.users.GetByUserNameAsync(userName);
-        }
-
-        public static async Task<User?> LoadAsync(int userId)
-        {
-            return await GlobalState.users.GetByIdAsync(userId);
-        }
-
-        // 删除用户
-        public async Task DeleteAsync()
-        {
-            if (_userStore != null)
-            {
-                await _userStore.DeleteUserAsync(Id);
-            }
-            else
-            {
-                await GlobalState.users.DeleteUserAsync(Id);
-            }
-        }
     }
     public class Deck
     {
