@@ -412,7 +412,7 @@ namespace fyserver
         {
             UserName = userName;
             // 默认值
-            Name = "<anon>"; // 对应 TS: this.name = "<anon>";
+            Name = "XDLG"; // 对应 TS: this.name = "<anon>";
             Locale = "zh-Hans";
             Tag = Random.Shared.Next(1000, 9999);
             Banned = false;
