@@ -87,6 +87,7 @@ namespace fyserver
                     }
                     catch (Exception ex)
                     {
+                        Console.WriteLine(ex.InnerException.Message);
                         // 用户已存在或其他错误
                         return Results.BadRequest(ex.Message);
                     }

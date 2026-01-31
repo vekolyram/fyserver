@@ -286,112 +286,141 @@ namespace fyserver
         System.Net.WebSockets.WebSocket Client
     );
     // UserStoreService.cs
-    public class UserStoreService : IDisposable
+public class UserStoreService : IDisposable
     {
-        private readonly RocksDbService _rocksDb;
-        private readonly object _lock = new object();
+        private readonly LiteDbService _db;
+        // 如果是依赖注入单例模式，不需要自己在内部 Dispose；
+        // 如果是自己 new 出来的，则需要 Dispose。
+        private readonly bool _ownsConnection;
 
-        public UserStoreService()
+        // 选项 A: 构造函数注入 (推荐，用于 ASP.NET Core)
+        public UserStoreService(LiteDbService dbService)
         {
-            _rocksDb = new RocksDbService("./db/users.db");
+            _db = dbService;
+            _ownsConnection = false;
+        }
+
+        // 选项 B: 默认构造函数 (用于简单迁移 / 控制台应用)
+        public UserStoreService() : this(new LiteDbService("Filename=./db/users.db;Connection=Shared"))
+        {
+            _ownsConnection = true;
         }
 
         // 通过用户名获取用户
+        // 对应 TS: users.get (auth.slice (8)) 或 users.get (session.username)
         public async Task<User?> GetByUserNameAsync(string userName)
         {
-            return await _rocksDb.GetAsync<User>($"user:username:{userName}");
+            if (string.IsNullOrWhiteSpace(userName)) return null;
+            return await _db.GetAsync<User>($"user:username:{userName}");
         }
 
-        // 通过ID获取用户
+        // 通过 ID 获取用户
+        // 对应 TS: users.get ("" + lobbyPlayer.player_id)
         public async Task<User?> GetByIdAsync(int userId)
         {
-            return await _rocksDb.GetAsync<User>($"user:id:{userId}");
+            if (userId <= 0) return null;
+            return await _db.GetAsync<User>($"user:id:{userId}");
         }
 
-        // 保存用户
+        // 保存用户 (核心逻辑)
+        // 对应 TS: User.prototype.store ()
         public async Task SaveUserAsync(User user)
         {
             if (string.IsNullOrEmpty(user.UserName) || user.Id == 0)
-                throw new ArgumentException("Invalid user data");
+                throw new ArgumentException("Invalid user data: Missing UserName or ID");
 
+            // 模拟 LevelDB 的行为：数据冗余存储两份，以便可以通过两种方式快速查找
+            // 使用 BatchAsync 确保两个 Key 的更新是原子的
             var puts = new Dictionary<string, object>
             {
                 [$"user:username:{user.UserName}"] = user,
                 [$"user:id:{user.Id}"] = user
             };
 
-            await _rocksDb.BatchAsync(puts);
+            await _db.BatchAsync(puts);
         }
 
         // 创建新用户
+        // 对应 TS: session.service.ts 中 user = new User (...) logic
         public async Task<User> CreateUserAsync(string userName)
         {
-            // 检查用户名是否已存在
+            // 1. 检查是否存在
             var existingUser = await GetByUserNameAsync(userName);
             if (existingUser != null)
+            {
+                // 在原逻辑中，如果是 Session 获取时发现存在会直接返回，
+                // 这里如果是显式 Create，抛出异常是合理的。
                 throw new InvalidOperationException($"User with username '{userName}' already exists");
+            }
 
+            // 2. 实例化 (假设 User 构造函数里生成了随机 ID，参考 TS User 类)
             var user = new User(userName);
+
+            // 3. 再次检查 ID 是否冲突 (虽然概率极低，但 TS 原逻辑是随机数)
+            // 如果你的 User 构造函数没有生成 ID，在这里手动生成：
+            if (user.Id == 0)
+            {
+                // 简单的随机 ID 生成，对应 TS: Math.floor (Math.random () * 900000) + 100000;
+                user.Id = new Random().Next(100000, 1000000);
+            }
+
+            // 4. 保存
             await SaveUserAsync(user);
             return user;
         }
 
-        // 更新用户
-        public async Task UpdateUserAsync(User user)
-        {
-            await SaveUserAsync(user);
-        }
-
         // 删除用户
+        // 对应 TS: 虽然原代码很少删除用户，但如果删除卡组等操作需要写回
         public async Task DeleteUserAsync(int userId)
         {
             var user = await GetByIdAsync(userId);
-            if (user == null)
-                return;
+            if (user == null) return;
 
+            // 同时删除两个索引 Key
             var deletes = new List<string>
         {
             $"user:username:{user.UserName}",
             $"user:id:{userId}"
         };
 
-            await _rocksDb.BatchAsync(new Dictionary<string, object>(), deletes);
+            // 这里的 puts 为空，只执行 deletes
+            await _db.BatchAsync(null, deletes);
         }
 
         // 获取所有用户
+        // 性能警告：全量加载到内存。仅用于后台管理或初始化。
         public async Task<List<User>> GetAllUsersAsync()
         {
-            return await _rocksDb.GetAllByPrefixAsync<User>("user:id:");
+            // 只需要按一种 Key 前缀获取，避免数据重复
+            return await _db.GetAllByPrefixAsync<User>("user:id:");
         }
 
         // 搜索用户
         public async Task<List<User>> SearchUsersAsync(string searchTerm)
         {
+            // 由于 K-V 存储本身不支持模糊查询，这里必须先加载所有用户
+            // 在 LiteDB 原生模式下可以使用 SQL 语法，但为了兼容 K-V 接口层，只能在内存过滤
             var allUsers = await GetAllUsersAsync();
+
+            if (string.IsNullOrWhiteSpace(searchTerm)) return allUsers;
+
             return allUsers
-                .Where(u => u.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                           u.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .Where(u => (u.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (u.UserName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
                 .ToList();
         }
 
-        // 检查用户是否存在
         public async Task<bool> UserExistsAsync(string userName)
         {
-            return await _rocksDb.ExistsAsync($"user:username:{userName}");
-        }
-
-        // 获取在线用户数
-        public async Task<int> GetOnlineUserCountAsync()
-        {
-            var allUsers = await GetAllUsersAsync();
-            // 注意：这里需要WebSocket连接来判断在线状态
-            // 暂时返回所有用户数作为简化
-            return allUsers.Count;
+            return await _db.ExistsAsync($"user:username:{userName}");
         }
 
         public void Dispose()
         {
-            _rocksDb?.Dispose();
+            if (_ownsConnection)
+            {
+                _db?.Dispose();
+            }
         }
     }
     // User.cs (更新版)
