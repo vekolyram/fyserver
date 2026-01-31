@@ -47,24 +47,12 @@ namespace fyserver
             int GetPlayerIdFromAuth(HttpContext context)
             {
                 var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-                if (authHeader != null && authHeader.StartsWith("Bearer "))
+                if (authHeader != null && authHeader.StartsWith("JWT "))
                 {
-                    return int.Parse(authHeader["Bearer ".Length..]);
+                    return GlobalState.users.GetByUserNameAsync(authHeader["JWT ".Length..]).Id;
                 }
                 return 0;
             }
-            User? GetUserFromAuth(HttpContext context)
-            {
-                var playerId = GetPlayerIdFromAuth(context);
-                if (playerId > 0)
-                {
-                    // 从数据库获取用户
-                    var user = GlobalState.users.GetByIdAsync(playerId).Result;
-                    return user;
-                }
-                return null;
-            }
-
             // 1. 会话管理
             app.MapPost("/session", async (Session session) =>
             {
@@ -73,6 +61,7 @@ namespace fyserver
                 try
                 {
                     user = await GlobalState.users.GetByUserNameAsync(session.Username);
+                    Console.WriteLine($"Find user: {session.Username}");
                 }
                 catch (Exception)
                 {
@@ -84,6 +73,7 @@ namespace fyserver
                     try
                     {
                         user = await GlobalState.users.CreateUserAsync(session.Username);
+                        Console.WriteLine($"Created new user: {session.Username}");
                     }
                     catch (Exception ex)
                     {
@@ -234,10 +224,14 @@ namespace fyserver
                 return null;
             }
             // 2. 配置和基本信息
-            app.MapGet("/", (HttpContext context) =>
+            app.MapGet("/", async (HttpContext context) =>
             {
                 var auth = context.Request.Headers["Authorization"].FirstOrDefault();
-                return Results.Ok(config.appconfig.getConfig(auth));
+                if (auth == null)
+                {
+                    auth = "1939Mother";
+                }
+                return Results.Ok(await config.appconfig.getConfigAsync(auth));
             });// 3. 玩家管理
             //TODO: 完善entitlements接口,用于处理所有权
             app.MapGet("/entitlements/{id}", (HttpContext context) =>

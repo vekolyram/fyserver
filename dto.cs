@@ -348,6 +348,7 @@ namespace fyserver
                 return existingUser;
                 // 或者: throw new InvalidOperationException ($"User '{userName}' already exists");
             }
+
             var user = new User(userName);
             // 2. 生成唯一 ID (带冲突重试)
             // 原 TS 逻辑: Math.floor (Math.random () * 900000) + 100000;
