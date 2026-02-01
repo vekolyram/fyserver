@@ -304,21 +304,22 @@ namespace fyserver
             _ownsConnection = true;
         }
 
-        public async Task<User?> GetByUserNameAsync(string userName)
+        public Task<User?> GetByUserNameAsync(string userName)
         {
-            if (string.IsNullOrWhiteSpace(userName)) return null;
-            var a = await _db.GetAsync<User?>($"user:username:{userName}");
-            return a;
+            if (string.IsNullOrWhiteSpace(userName)) return Task.FromResult<User?>(null);
+            var a = _db.Get<User>($"user:username:{userName}");
+            return Task.FromResult<User?>(a);
         }
 
-        public async Task<User?> GetByIdAsync(int userId)
+        public Task<User?> GetByIdAsync(int userId)
         {
-            if (userId <= 0) return null;
-            return await _db.GetAsync<User>($"user:id:{userId}");
+            if (userId <= 0) return Task.FromResult<User?>(null);
+            var u = _db.Get<User>($"user:id:{userId}");
+            return Task.FromResult<User?>(u);
         }
 
         // 核心保存逻辑
-        public async Task SaveUserAsync(User user)
+        public Task SaveUserAsync(User user)
         {
             if (string.IsNullOrEmpty(user.UserName) || user.Id == 0)
                 throw new ArgumentException("Invalid user data: Missing UserName or ID");
@@ -334,7 +335,8 @@ namespace fyserver
                 [$"user:id:{user.Id}"] = user
             };
 
-            await _db.BatchAsync(puts);
+            _db.Batch(puts);
+            return Task.CompletedTask;
         }
 
         // 创建用户：处理 ID 生成和冲突
@@ -356,13 +358,13 @@ namespace fyserver
             var rnd = Random.Shared;
             int newId;
             bool idExists;
-            do
-            {
-                newId = rnd.Next(100000, 1000000); // 100k - 999k
-                                                   // 必须检查 ID 是否被占用
-                idExists = await _db.ExistsAsync($"user:id:{newId}");
-            } while (idExists);
-
+            //do
+            //{
+            //    newId = rnd.Next(100000, 1000000); // 100k - 999k
+            //                                       // 必须检查 ID 是否被占用
+            //    idExists = _db.Exists($"user:id:{newId}");
+            //} while (idExists);
+            newId = rnd.Next(100000, 1000000);
             user.Id = newId;
 
             // 3. 保存
@@ -381,13 +383,15 @@ namespace fyserver
                 $"user:id:{userId}"
             };
 
-            await _db.BatchAsync(null, deletes);
+            _db.Batch(null, deletes);
+            await Task.CompletedTask;
         }
 
-        public async Task<List<User>> GetAllUsersAsync()
+        public Task<List<User>> GetAllUsersAsync()
         {
             // 只取一种 Key 前缀，防止数据重复
-            return await _db.GetAllByPrefixAsync<User>("user:id:");
+            var list = _db.GetAllByPrefix<User>("user:id:");
+            return Task.FromResult(list);
         }
         public void Dispose()
         {

@@ -183,7 +183,7 @@
 //}
 using LiteDB;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+// synchronous implementation - no Task/async
 using System.Collections.Concurrent;
 using System.Linq;
 
@@ -219,9 +219,8 @@ public class LiteDbService : IDisposable
         _col = _db.GetCollection(CollectionName);
         _col.EnsureIndex(IdField);
     }
-    // 存储值
-    // LiteDB 是同步IO，为了匹配接口的 async/Task，这里同步执行并返回已完成 Task
-    public Task PutAsync(string key, object value)
+    // 存储值 (同步)
+    public void Put(string key, object value)
     {
         // 我们构建一个 BsonDocument 来包装数据
         // _id = 你的 key
@@ -238,17 +237,17 @@ public class LiteDbService : IDisposable
         // Update in-memory cache
         _payloadCache[key] = doc[PayloadField];
         _objectCache[key] = value!;
-        return Task.CompletedTask;
+        return;
     }
 
     // 获取值
-    public Task<T?> GetAsync<T>(string key)
+    public T? Get<T>(string key)
     {
         if (_verboseLogging) Console.WriteLine($"Looking for key: {key}");
         // Try object cache first (fastest)
         if (_objectCache.TryGetValue(key, out var obj))
         {
-            if (obj is T t) return Task.FromResult<T?>(t);
+            if (obj is T t) return t;
             // if stored object type doesn't match requested type, fall through
         }
 
@@ -259,7 +258,7 @@ public class LiteDbService : IDisposable
             {
                 var des = Mapper.Deserialize<T>(cached);
                 _objectCache[key] = des!;
-                return Task.FromResult<T?>(des);
+                return des;
             }
             catch
             {
@@ -271,7 +270,7 @@ public class LiteDbService : IDisposable
         if (_verboseLogging) Console.WriteLine($"Looking for doc{doc}");
         if (doc == null)
         {
-            return Task.FromResult<T?>(default);
+            return default;
         }
 
         var payload = doc[PayloadField];
@@ -280,31 +279,30 @@ public class LiteDbService : IDisposable
         var deserialized = Mapper.Deserialize<T>(payload);
         _objectCache[key] = deserialized!;
         // 反序列化 payload 字段回原本的类型 T
-        return Task.FromResult<T?>(deserialized);
+        return deserialized;
     }
 
-    // 删除值
-    public Task DeleteAsync(string key)
+    // 删除值 (同步)
+    public void Delete(string key)
     {
         _col.Delete(key);
         // remove from cache
         _payloadCache.TryRemove(key, out _);
         _objectCache.TryRemove(key, out _);
-        return Task.CompletedTask;
     }
 
-    // 检查键是否存在
-    public Task<bool> ExistsAsync(string key)
+    // 检查键是否存在 (同步)
+    public bool Exists(string key)
     {
         // check object cache first
-        if (_objectCache.ContainsKey(key)) return Task.FromResult(true);
+        if (_objectCache.ContainsKey(key)) return true;
         // then payload cache
-        if (_payloadCache.ContainsKey(key)) return Task.FromResult(true);
-        return Task.FromResult(_col.Exists(Query.EQ(IdField, key)));
+        if (_payloadCache.ContainsKey(key)) return true;
+        return _col.Exists(Query.EQ(IdField, key));
     }
 
-    // 获取所有键
-    public Task<List<string>> GetAllKeysAsync()
+    // 获取所有键 (同步)
+    public List<string> GetAllKeys()
     {
         // 这是一个比较重的操作，类似于 LevelDB 的全量扫描
         var result = new List<string>();
@@ -312,11 +310,11 @@ public class LiteDbService : IDisposable
         {
             result.Add(doc[IdField].AsString);
         }
-        return Task.FromResult(result);
+        return result;
     }
 
-    // 根据前缀获取所有键 (模拟 LevelDB 的 iterator 扫描)
-    public Task<List<string>> GetKeysByPrefixAsync(string prefix)
+    // 根据前缀获取所有键 (模拟 LevelDB 的 iterator 扫描) (同步)
+    public List<string> GetKeysByPrefix(string prefix)
     {
         // LiteDB 支持 StartsWith 查询
         var result = new List<string>();
@@ -324,11 +322,11 @@ public class LiteDbService : IDisposable
         {
             result.Add(doc[IdField].AsString);
         }
-        return Task.FromResult(result);
+        return result;
     }
 
-    // 根据前缀获取所有值
-    public Task<List<T>> GetAllByPrefixAsync<T>(string prefix)
+    // 根据前缀获取所有值 (同步)
+    public List<T> GetAllByPrefix<T>(string prefix)
     {
         var docs = _col.Find(Query.StartsWith(IdField, prefix));
 
@@ -343,15 +341,15 @@ public class LiteDbService : IDisposable
             _objectCache[key] = des!;
             result.Add(des);
         }
-        return Task.FromResult(result);
+        return result;
     }
 
-    // 批量操作 (事务支持)
-    public Task BatchAsync(Dictionary<string, object> puts, List<string> deletes = null)
+    // 批量操作 (事务支持) (同步)
+    public void Batch(Dictionary<string, object> puts, List<string> deletes = null)
     {
         if ((deletes == null || deletes.Count == 0) && (puts == null || puts.Count == 0))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         // 开启事务，保证批量操作的原子性
@@ -390,14 +388,12 @@ public class LiteDbService : IDisposable
             _db.Rollback();
             throw;
         }
-        return Task.CompletedTask;
     }
 
-    // 清空数据库 (删除集合)
-    public Task ClearAsync()
+    // 清空数据库 (删除集合) (同步)
+    public void Clear()
     {
         _db.DropCollection(CollectionName);
-        return Task.CompletedTask;
     }
 
     public void Dispose()
