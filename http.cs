@@ -63,10 +63,10 @@ namespace fyserver
                 }
                 catch (Exception)
                 {
-                    // 处理异常
                 }
                 if (user == null)
                 {
+                    Console.WriteLine("未找到");
                     try
                     {
                         user = await GlobalState.users.CreateUserAsync(session.Username);

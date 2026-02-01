@@ -7,7 +7,7 @@ namespace fyserver
         public static readonly LibraryResponse Library = new(
             new List<LibraryItem>
             {
-            new("card_unit_seahawk", 4, 5, 2001, 0)
+            new("card_unit_seahawk", 1, 0, 2001, 0)
             },
             new List<object>()
         );
@@ -307,7 +307,8 @@ namespace fyserver
         public async Task<User?> GetByUserNameAsync(string userName)
         {
             if (string.IsNullOrWhiteSpace(userName)) return null;
-            return await _db.GetAsync<User>($"user:username:{userName}");
+            var a = await _db.GetAsync<User?>($"user:username:{userName}");
+            return a;
         }
 
         public async Task<User?> GetByIdAsync(int userId)
