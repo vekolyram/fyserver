@@ -38,11 +38,9 @@ namespace fyserver
                 {
                     context.Response.ContentType = context.Response.ContentType.Replace("; charset=utf-8", "");
                 }
+                Console.WriteLine($"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
                 await next();
             });
-            app.MapGet("/hello", () => "Hello named route")
-               .WithName("hi");
-
             // 辅助方法
             int GetPlayerIdFromAuth(HttpContext context)
             {
@@ -67,7 +65,6 @@ namespace fyserver
                 {
                     // 处理异常
                 }
-
                 if (user == null)
                 {
                     try
@@ -226,9 +223,17 @@ namespace fyserver
             // 2. 配置和基本信息
             app.MapGet("/", async (HttpContext context) =>
             {
-                var auth = context.Request.Headers["Authorization"].FirstOrDefault();
+                var auth = (context.Request.Headers["Authorization"].FirstOrDefault());
+                Console.WriteLine(auth);
                 if (auth == null)
                 {
+                    auth = "1939Mother";
+                }
+                else
+                {
+                    string authToken = auth["JWT ".Length..];
+                    User? user = await GlobalState.users.GetByUserNameAsync(authToken);
+                    if(user == null)
                     auth = "1939Mother";
                 }
                 return Results.Ok(await config.appconfig.getConfigAsync(auth));
@@ -259,10 +264,21 @@ namespace fyserver
                     context.Response.Headers["Content-Type"] = context.Response.Headers["Content-Type"].ToString().Replace("; charset=utf-8", "");
                     return Task.CompletedTask;
                 });
-
+                //var originalPath = context.Request.Path;
+                //var normalizedPath = originalPath.Value.Replace("//", "/");
+                //if (string.IsNullOrEmpty(normalizedPath))
+                //{
+                //    normalizedPath = "/";
+                //}
+                //Console.WriteLine(normalizedPath);
+                //if (originalPath.Value != normalizedPath)
+                //{
+                //    context.Request.Path = normalizedPath;
+                //}
                 await next();
             });
-            app.MapGet("/players/{player_id}/friends", async (HttpContext context) =>
+            // 中间件：规范化路径（移除多余斜杠）
+            app.MapGet("/{a}/players/{player_id}/friends", async (HttpContext context) =>
             {
                 List<int> nil = new();
                 return Results.Ok(new FriendsReponse(Friends:nil,PreviousOpponents:nil));
@@ -271,7 +287,10 @@ namespace fyserver
             {
                 return Results.Ok(new { });
             });
-
+            app.MapMethods("/players/notifications/{id}", new[] { "PUT", "DELETE" }, (string id) =>
+            {
+                return Results.Ok(new { });
+            });
             // 4. 卡牌库和卡组
             app.MapGet("/players/{id}/librarynew", (string id) =>
             {
