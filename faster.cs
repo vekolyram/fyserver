@@ -26,7 +26,7 @@ public class FasterKvService : IDisposable
         {
             Directory.CreateDirectory(logDirectory);
         }
-
+       
         // 创建 FASTER KV 设置
         var logSettings = new LogSettings
         {
@@ -50,7 +50,6 @@ public class FasterKvService : IDisposable
         // 创建客户端会话
         _session = _fasterKv.NewSession(new SimpleFunctions<string, string, Empty>());
     }
-
     // 存储值 (同步)
     public void Put(string key, object value)
     {
@@ -60,7 +59,6 @@ public class FasterKvService : IDisposable
         // FASTER 的 Upsert 操作
         _session.Upsert(ref key, ref jsonString);
         _session.CompletePending(true);
-
         if (_verboseLogging)
             Console.WriteLine($"Put: key={key}, size={jsonString.Length} bytes");
     }
@@ -110,8 +108,6 @@ public class FasterKvService : IDisposable
         _session.CompletePending(true);
         return !string.IsNullOrEmpty(output);
     }
-
-    // 获取所有键 (同步) - 注意：FASTER 需要迭代所有记录
     public List<string> GetAllKeys()
     {
         throw new NotSupportedException("GetAllKeys is not supported for FasterKvService in this build.");
