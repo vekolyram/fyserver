@@ -293,6 +293,13 @@ namespace fyserver
         private readonly bool _ownsConnection;
 
         // 构造函数保持不变...
+     
+    public class UserStoreService : IDisposable
+    {
+        private readonly LiteDbService _db;
+        private readonly bool _ownsConnection;
+
+        // 构造函数
         public UserStoreService(LiteDbService dbService)
         {
             _db = dbService;
@@ -354,7 +361,6 @@ namespace fyserver
 
             var user = new User(userName);
             // 2. 生成唯一 ID (带冲突重试)
-            // 原 TS 逻辑: Math.floor (Math.random () * 900000) + 100000;
             var rnd = Random.Shared;
             int newId;
             bool idExists;
@@ -393,6 +399,7 @@ namespace fyserver
             var list = _db.GetAllByPrefix<User>("user:id:");
             return Task.FromResult(list);
         }
+        
         public void Dispose()
         {
             if (_ownsConnection)
@@ -401,10 +408,11 @@ namespace fyserver
             }
         }
     }
-    // User.cs (更新版)
+    
+    // User.cs
     public class User
     {
-        // 无参构造函数对 LiteDB 是必须的
+        // 无参构造函数对 LiteDB 和 System.Text.Json 都是必须的
         public User()
         {
             // 初始化集合，防止空引用
@@ -417,11 +425,10 @@ namespace fyserver
         {
             UserName = userName;
             // 默认值
-            Name = "XDLG"; // 对应 TS: this.name = "<anon>";
+            Name = "XDLG";
             Locale = "zh-Hans";
             Tag = Random.Shared.Next(1000, 9999);
             Banned = false;
-            // ID 的生成移交给 Service 层处理，或者在这里暂存
         }
 
         public int Id { get; set; }
@@ -430,8 +437,8 @@ namespace fyserver
         public string Locale { get; set; } = "";
         public int Tag { get; set; }
 
-        // 直接存储 Dictionary，LiteDB 支持。
-        // System.Text.Json 默认会将 int key 转为 string key ("1001": {...})，这通常是可以接受的。
+        // System.Text.Json 支持 Dictionary<int, T> 的序列化
+        // 会自动将 int key 转为 string key ("1": {...})
         public Dictionary<int, Deck> Decks { get; set; }
 
         public List<Item> EquippedItem { get; set; }
@@ -441,6 +448,7 @@ namespace fyserver
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
+
     public class Deck
     {
         public Deck()
