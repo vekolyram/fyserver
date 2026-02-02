@@ -9,7 +9,7 @@ public class LiteDbService : IDisposable
     private const string CollectionName = "kv_store";
     private const string IdField = "_id";
     private const string PayloadField = "payload";
-    
+
     // System.Text.Json 序列化选项
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -17,11 +17,11 @@ public class LiteDbService : IDisposable
         WriteIndented = false,
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
     };
-    
+
     private readonly bool _verboseLogging;
 
     // 构造函数：传入数据库路径
-    public LiteDbService(string connectionString = "Filename=./db/users.db;Connection=Shared", bool verboseLogging = false)
+    public LiteDbService(string connectionString = "Filename=./db/users.db;Connection=Shared", bool verboseLogging = true)
     {
         _verboseLogging = verboseLogging;
 
@@ -33,7 +33,7 @@ public class LiteDbService : IDisposable
         {
             Directory.CreateDirectory(directory);
         }
-        
+
         // 确保 _id (即你的 Key) 有索引，保证查询速度
         _col = _db.GetCollection(CollectionName);
         _col.EnsureIndex(IdField);
@@ -44,7 +44,7 @@ public class LiteDbService : IDisposable
     {
         // 使用 System.Text.Json 序列化为 JSON 字符串
         var jsonString = System.Text.Json.JsonSerializer.Serialize(value, value.GetType(), JsonOptions);
-        
+
         var doc = new BsonDocument
         {
             [IdField] = key,
@@ -53,29 +53,29 @@ public class LiteDbService : IDisposable
 
         // Upsert: 如果存在则更新，不存在则插入
         _col.Upsert(doc);
-        
-        if (_verboseLogging) 
+
+        if (_verboseLogging)
             Console.WriteLine($"Put: key={key}, size={jsonString.Length} bytes");
     }
 
     // 获取值
     public T? Get<T>(string key)
     {
-        if (_verboseLogging) 
+        if (_verboseLogging)
             Console.WriteLine($"Get<{typeof(T).Name}>: Looking for key={key}");
 
         var doc = _col.FindById(key);
-        
+
         if (doc == null)
         {
-            if (_verboseLogging) 
+            if (_verboseLogging)
                 Console.WriteLine($"Get<{typeof(T).Name}>: key={key} not found");
             return default;
         }
 
         var jsonString = doc[PayloadField].AsString;
-        
-        if (_verboseLogging) 
+
+        if (_verboseLogging)
             Console.WriteLine($"Get<{typeof(T).Name}>: key={key}, size={jsonString.Length} bytes");
 
         // 使用 System.Text.Json 反序列化
@@ -87,8 +87,8 @@ public class LiteDbService : IDisposable
     public void Delete(string key)
     {
         _col.Delete(key);
-        
-        if (_verboseLogging) 
+
+        if (_verboseLogging)
             Console.WriteLine($"Delete: key={key}");
     }
 
@@ -173,7 +173,7 @@ public class LiteDbService : IDisposable
             }
 
             _db.Commit();
-            
+
             if (_verboseLogging)
             {
                 var putCount = puts?.Count ?? 0;

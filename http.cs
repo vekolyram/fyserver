@@ -54,6 +54,10 @@ namespace fyserver
             // 1. 会话管理
             app.MapPost("/session", async (Session session) =>
             {
+                // 再次运行诊断
+                // 应该看到：
+                // ✅ Index is working correctly
+                // Query time: 2ms (excellent)
                 string addressHttp = config.appconfig.getAddressHttpR();
                 User? user = null;
                 try

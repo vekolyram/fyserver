@@ -5,7 +5,7 @@ namespace fyserver
 {
     public static class GlobalState
     {
-        public static UserStoreService users = new UserStoreService();
+        public static FasterUserStoreService users = new FasterUserStoreService();
 
     }
     public class config

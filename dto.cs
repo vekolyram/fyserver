@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-
 namespace fyserver
 {
     public class a
@@ -292,13 +291,6 @@ namespace fyserver
         private readonly LiteDbService _db;
         private readonly bool _ownsConnection;
 
-        // 构造函数保持不变...
-     
-    public class UserStoreService : IDisposable
-    {
-        private readonly LiteDbService _db;
-        private readonly bool _ownsConnection;
-
         // 构造函数
         public UserStoreService(LiteDbService dbService)
         {
@@ -364,12 +356,6 @@ namespace fyserver
             var rnd = Random.Shared;
             int newId;
             bool idExists;
-            //do
-            //{
-            //    newId = rnd.Next(100000, 1000000); // 100k - 999k
-            //                                       // 必须检查 ID 是否被占用
-            //    idExists = _db.Exists($"user:id:{newId}");
-            //} while (idExists);
             newId = rnd.Next(100000, 1000000);
             user.Id = newId;
 
@@ -408,7 +394,114 @@ namespace fyserver
             }
         }
     }
-    
+    public class FasterUserStoreService : IDisposable
+    {
+        private readonly FasterKvService _db;
+        private readonly bool _ownsConnection;
+
+        // 构造函数
+        public FasterUserStoreService(FasterKvService dbService)
+        {
+            _db = dbService;
+            _ownsConnection = false;
+        }
+
+        public FasterUserStoreService() : this(new FasterKvService())
+        {
+            _ownsConnection = true;
+        }
+        public Task<User?> GetByUserNameAsync(string userName)
+        {
+            if (string.IsNullOrWhiteSpace(userName)) return Task.FromResult<User?>(null);
+            var a = _db.Get<User>($"user:username:{userName}");
+            return Task.FromResult<User?>(a);
+        }
+
+        public Task<User?> GetByIdAsync(int userId)
+        {
+            if (userId <= 0) return Task.FromResult<User?>(null);
+            var u = _db.Get<User>($"user:id:{userId}");
+            return Task.FromResult<User?>(u);
+        }
+
+        // 核心保存逻辑
+        public Task SaveUserAsync(User user)
+        {
+            if (string.IsNullOrEmpty(user.UserName) || user.Id == 0)
+                throw new ArgumentException("Invalid user data: Missing UserName or ID");
+
+            // 更新修改时间
+            user.UpdatedAt = DateTime.UtcNow;
+
+            // 模拟 LevelDB 的双重索引 (冗余存储)
+            // LiteDB 的 Batch 操作保证了原子性：要么都成功，要么都失败
+            var puts = new Dictionary<string, object>
+            {
+                [$"user:username:{user.UserName}"] = user,
+                [$"user:id:{user.Id}"] = user
+            };
+
+            _db.Batch(puts);
+            return Task.CompletedTask;
+        }
+
+        // 创建用户：处理 ID 生成和冲突
+        public async Task<User> CreateUserAsync(string userName)
+        {
+            // 1. 检查用户名是否存在
+            var existingUser = await GetByUserNameAsync(userName);
+            if (existingUser != null)
+            {
+                // 如果是幂等设计，可以直接返回旧用户；如果是严格创建，抛异常
+                // 这里为了安全起见，如果不慎重复调用，返回已存在的
+                return existingUser;
+                // 或者: throw new InvalidOperationException ($"User '{userName}' already exists");
+            }
+
+            var user = new User(userName);
+            // 2. 生成唯一 ID (带冲突重试)
+            var rnd = Random.Shared;
+            int newId;
+            bool idExists;
+            newId = rnd.Next(100000, 1000000);
+            user.Id = newId;
+
+            // 3. 保存
+            await SaveUserAsync(user);
+            return user;
+        }
+
+        public async Task DeleteUserAsync(int userId)
+        {
+            var user = await GetByIdAsync(userId);
+            if (user == null) return;
+
+            var deletes = new List<string>
+            {
+                $"user:username:{user.UserName}",
+                $"user:id:{userId}"
+            };
+
+            _db.Batch(null, deletes);
+            await Task.CompletedTask;
+        }
+
+        public Task<List<User>> GetAllUsersAsync()
+        {
+            // 只取一种 Key 前缀，防止数据重复
+            var list = _db.GetAllByPrefix<User>("user:id:");
+            return Task.FromResult(list);
+        }
+
+        public void Dispose()
+        {
+            if (_ownsConnection)
+            {
+                _db?.Dispose();
+            }
+        }
+    }
+
     // User.cs
     public class User
     {
