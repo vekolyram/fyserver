@@ -1,4 +1,6 @@
 ﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using JsonIgnoreAttribute = System.Text.Json.Serialization.JsonIgnoreAttribute;
 namespace fyserver
 {
     public class a
@@ -12,10 +14,10 @@ namespace fyserver
         public static LibraryResponse Library = new(
             new List<LibraryItem>
             {
-            //new("card_unit_seahawk", 1, 0, 2001, 0),
-            //new("card_wildcard_elite",99,0,1065,0),
-            //  new("card_wildcard_limited",99,0,1071,0),
-            //new("card_wildcard_special",99,0,1076,0)
+                //new("card_unit_seahawk", 1, 0, 2001, 0),
+                //new("card_wildcard_elite",99,0,1065,0),
+                //  new("card_wildcard_limited",99,0,1071,0),
+                //new("card_wildcard_special",99,0,1076,0)
             },
             new List<object>()
         );
@@ -25,16 +27,16 @@ namespace fyserver
         new Item("", "cardback_yokoshiba", "")
     };
 
-        public static Dictionary<string, CardLookup> DeckCodeTable = new()
-    {
-        { "v7", new CardLookup("card_unit_1st_airborne", "v7", 2001) }
-    };
-        public static void InitLibrary(String Path) {
+        public static Dictionary<string, CardLookup> DeckCodeTable = new();
+        public static void InitLibrary(string Path, string path2)
+        {
             string a = File.ReadAllText(Path);
             List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(a);
-            foreach (var c in cs) { 
+            foreach (var c in cs)
+            {
                 Library.Cards.Add(new LibraryItem(c.card, 40, 0, c.ID, 0));
                 DeckCodeTable.Add(c.deck_code_id, new CardLookup(c.card, c.deck_code_id, c.ID));
+                //现在我打算把桌饰写出来
             }
         }
     }
@@ -44,6 +46,43 @@ namespace fyserver
          string Value,
          string DeckCode
     );
+    public class FPResponseObject
+    {
+        public FPResponseOO Content { get; set; }
+        [JsonPropertyName("elementId")]
+        public int Id { get; set; }
+        [JsonPropertyName("endDate")]
+        public string EndDate = "0001-01-01T00:00:00Z";
+        [JsonPropertyName("startDate")]
+        public string StartDate = "9999-01-01T00:00:00Z";
+        [JsonPropertyName("isPublished")]
+        public bool IsPublished = true;
+        [JsonPropertyName("isTargeted")]
+        public bool IsTargeted = false;
+    };
+    public record FPResponseOO(
+    FPText BannerText,
+    FPText Heading,
+    Dictionary<string, string> Icon,
+    string ImageUrl,
+    string Link,
+    int Priority,
+    FPText SubHeading,
+    int Type,
+    int Slot
+        );
+    public record FPText(
+           string Text="",
+           int FontSize=56
+        );
+    public record FPResponse
+(
+List<FPResponseObject> Elements,
+        List<FPResponseObject> Targeted,
+bool Changed=true,
+string Message="OK",
+int StatusCode = 200
+);
     // Match DTOs as records
     public record LobbyPlayer(
         int PlayerId,

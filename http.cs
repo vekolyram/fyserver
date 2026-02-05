@@ -9,7 +9,7 @@ namespace fyserver
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         async public Task StartHttpServer()
         {
-            a.InitLibrary("./deckCodeIDsTable2.json");
+          //  a.InitLibrary("./deckCodeIDsTable2.json");
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
             builder.Services.AddEndpointsApiExplorer();
@@ -240,6 +240,11 @@ namespace fyserver
             //TODO: 完善fp接口,用于处理商店
             app.MapGet("/fp/", (HttpContext context) =>
             {
+                var ro = new FPResponseObject();
+                ro.Content = new FPResponseOO(BannerText: new(), Heading: new("JJC", 10), Icon: new() { ["IconUrl"] = "https://img.cdn1.vip/i/6984b654e6b78_1770305108.jpg" },ImageUrl: "https://helsinki-test.s3.eu-west-1.amazonaws.com/box-2/box_draft_edge_unclesam.jpg", Link:"kards:draft",Priority:3,Type:1,Slot:1,SubHeading:new());
+                ro.Id = 31;
+                var r = new FPResponse(Elements:new List<FPResponseObject>() { ro },Targeted:new());
+                return Results.Ok(r);
             });
             //TODO：http://kards.live.1939api.com//store/v2/?provider=xsolla HTTP/1.1，用于处理商店
             //
@@ -417,9 +422,6 @@ namespace fyserver
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
-
-
-
                 if (user.EquippedItem == null)
                     user.EquippedItem = new List<Item>();
 
@@ -442,9 +444,6 @@ namespace fyserver
                      //context.Connection.Close();
                      return Results.BadRequest("请改名");
                  }
-
-
-
                  // 检查卡组有效性（简化）
                  if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
                  {
