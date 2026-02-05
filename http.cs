@@ -899,7 +899,7 @@ namespace fyserver
             app.Lifetime.ApplicationStarted.Register(() =>
             {
                 Console.WriteLine($"Application started on {config.appconfig.getAddressHttp()}");
-                Console.WriteLine($"RocksDB database initialized at ./db/GlobalState.users.db");
+                Console.WriteLine($"Faster 已准备");
             });
 
             app.Lifetime.ApplicationStopping.Register(() =>

@@ -25,7 +25,7 @@ namespace fyserver
         new Item("", "cardback_yokoshiba", "")
     };
 
-        public static readonly Dictionary<string, CardLookup> DeckCodeTable = new()
+        public static Dictionary<string, CardLookup> DeckCodeTable = new()
     {
         { "v7", new CardLookup("card_unit_1st_airborne", "v7", 2001) }
     };
@@ -33,7 +33,8 @@ namespace fyserver
             string a = File.ReadAllText(Path);
             List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(a);
             foreach (var c in cs) { 
-                Library.Cards.Add(new LibraryItem(c.card, 4, 0, c.ID, 0));
+                Library.Cards.Add(new LibraryItem(c.card, 40, 0, c.ID, 0));
+                DeckCodeTable.Add(c.deck_code_id, new CardLookup(c.card, c.deck_code_id, c.ID));
             }
         }
     }
