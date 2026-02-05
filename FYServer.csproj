@@ -7,10 +7,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="deckCodeIDsTable2.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="deckCodeIDsTable2.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LiteDB" Version="6.0.0-prerelease.75" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
     <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="setting.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

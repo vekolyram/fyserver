@@ -1,15 +1,6 @@
-﻿
-using Microsoft.AspNetCore.Http.Json;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Formatters;
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using System;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using static fyserver.config;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace fyserver
 {
@@ -18,6 +9,7 @@ namespace fyserver
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         async public Task StartHttpServer()
         {
+            a.InitLibrary("./deckCodeIDsTable2.json");
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
             builder.Services.AddEndpointsApiExplorer();
@@ -54,10 +46,6 @@ namespace fyserver
             // 1. 会话管理
             app.MapPost("/session", async (Session session) =>
             {
-                // 再次运行诊断
-                // 应该看到：
-                // ✅ Index is working correctly
-                // Query time: 2ms (excellent)
                 string addressHttp = config.appconfig.getAddressHttpR();
                 User? user = null;
                 try
@@ -146,7 +134,7 @@ namespace fyserver
                     JapanLevel: 500,
                     JapanLevelClaimed: 500,
                     JapanXp: 0,
-                    Jti: "1",
+                    Jti: "114514",
                     Jwt: $"{session.Username}",
                     LastCrateClaimedDate: "2025-07-02T11:24:15.567042Z",
                     LastDailyMissionCancel: null,
@@ -177,7 +165,7 @@ namespace fyserver
                     Rewards: new List<object>(),
                     SeasonEnd: "2025-08-01T00:00:00Z",
                     SeasonWins: 9999,
-                    ServerOptions: JsonConvert.SerializeObject(new ServerOptions() { Websocketurl= config.appconfig.getAddressWs() }),
+                    ServerOptions: JsonConvert.SerializeObject(new ServerOptions() { Websocketurl = config.appconfig.getAddressWs() }),
                     ServerTime: DateTime.UtcNow.ToString("yyyy.MM.dd-HH.mm.ss"),
                     SovietLevel: 500,
                     SovietLevelClaimed: 500,
@@ -209,7 +197,6 @@ namespace fyserver
                     UsaXp: 0,
                     UserId: user.Id
                 );
-
                 return Results.Ok(response);
             });
 
@@ -231,28 +218,25 @@ namespace fyserver
                 Console.WriteLine(auth);
                 if (auth == null)
                 {
-                    auth = "1939Mother";
+                    auth = "JWT 1939Mother";
                 }
-                else
-                {
-                    string authToken = auth["JWT ".Length..];
-                    User? user = await GlobalState.users.GetByUserNameAsync(authToken);
-                    if(user == null)
-                    auth = "1939Mother";
-                }
+                string authToken = auth["JWT ".Length..];
+                User? user = await GlobalState.users.GetByUserNameAsync(authToken);
+                if (user == null)
+                    try
+                    {
+                        user = await GlobalState.users.CreateUserAsync(authToken);
+                        Console.WriteLine($"Created new user: {authToken}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.InnerException.Message);
+                        // 用户已存在或其他错误
+                        return Results.BadRequest(ex.Message);
+                    }
                 return Results.Ok(await config.appconfig.getConfigAsync(auth));
             });// 3. 玩家管理
             //TODO: 完善entitlements接口,用于处理所有权
-            app.MapGet("/entitlements/{id}", (HttpContext context) =>
-            {
-                List<Entitlement> e = new();
-                e.Add(new Entitlement
-                (
-                    EntitlementType : "emote",
-                    Name : "emote_appreciate"
-                )); 
-                return Results.Ok(e);
-            });
             //TODO: 完善fp接口,用于处理商店
             app.MapGet("/fp/", (HttpContext context) =>
             {
@@ -268,24 +252,34 @@ namespace fyserver
                     context.Response.Headers["Content-Type"] = context.Response.Headers["Content-Type"].ToString().Replace("; charset=utf-8", "");
                     return Task.CompletedTask;
                 });
-                //var originalPath = context.Request.Path;
-                //var normalizedPath = originalPath.Value.Replace("//", "/");
-                //if (string.IsNullOrEmpty(normalizedPath))
-                //{
-                //    normalizedPath = "/";
-                //}
-                //Console.WriteLine(normalizedPath);
-                //if (originalPath.Value != normalizedPath)
-                //{
-                //    context.Request.Path = normalizedPath;
-                //}
+                var originalPath = context.Request.Path;
+                var normalizedPath = originalPath.Value.Replace("//", "/");
+                if (string.IsNullOrEmpty(normalizedPath))
+                {
+                    normalizedPath = "/";
+                }
+                Console.WriteLine(normalizedPath);
+                if (originalPath.Value != normalizedPath)
+                {
+                    context.Request.Path = normalizedPath;
+                }
                 await next();
             });
             // 中间件：规范化路径（移除多余斜杠）
+            app.MapGet("/entitlements/{id}", (HttpContext context) =>
+            {
+                List<Entitlement> e = new();
+                e.Add(new Entitlement
+                (
+                    EntitlementType: "emote",
+                    Name: "emote_appreciate"
+                ));
+                return Results.Ok(e);
+            });
             app.MapGet("/{a}/players/{player_id}/friends", async (HttpContext context) =>
             {
                 List<int> nil = new();
-                return Results.Ok(new FriendsReponse(Friends:nil,PreviousOpponents:nil));
+                return Results.Ok(new FriendsReponse(Friends: nil, PreviousOpponents: nil));
             });
             app.MapMethods("/players/{id}/heartbeat", new[] { "PUT", "DELETE" }, (string id) =>
             {
@@ -306,9 +300,6 @@ namespace fyserver
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
-
-                
-
                 var deck = new Deck(createDeck, user.Id);
                 user.Decks[deck.Id] = deck;
 
@@ -330,27 +321,28 @@ namespace fyserver
                 });
             });
 
-            app.MapPut("/players/{player_id}/decks/{deck_id}", async (string player_id, int deck_id, Action action) =>
+            app.MapPut("/players/{player_id}/decks/{deck_id}", async (string player_id, int deck_id, [FromBody]DeckAction action) =>
             {
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(player_id));
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
-
-                
-
                 if (user.Decks.TryGetValue(deck_id, out var deck))
                 {
-                    switch (action.action)
+                Console.WriteLine(user.Decks[deck_id].Name);
+                    Console.WriteLine(action.ToString());
+                    switch (action.Action)
                     {
                         case "fill":
-                            deck.DeckCode = action.deck_code;
+                            Console.WriteLine(deck.Name);
+                            Console.WriteLine(action.DeckCode);
+                            Console.WriteLine(action.ToString());
+                            deck.DeckCode = action.DeckCode;
                             deck.ModifyDate = DateTime.Now;
                             break;
                     }
-
                     await GlobalState.users.SaveUserAsync(user);
                 }
-
+                Console.WriteLine((await GlobalState.users.GetByIdAsync(int.Parse(player_id))).Decks[deck_id].DeckCode);
                 return Results.Ok(new { });
             });
 
@@ -360,7 +352,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                
+
 
                 if (user.Decks.TryGetValue(changeDeck.Id, out var deck))
                 {
@@ -388,7 +380,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
 
-                
+
 
                 user.Decks.Remove(deck_id);
                 await GlobalState.users.SaveUserAsync(user);
@@ -403,7 +395,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                
+
 
                 if (user.Items == null || user.Items.Count == 0)
                 {
@@ -412,7 +404,7 @@ namespace fyserver
                 }
 
                 var response = new ItemsResponse(
-                    
+
                     EquippedItems: user.EquippedItem,
                     Items: user.Items
                 );
@@ -426,7 +418,7 @@ namespace fyserver
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
 
-                
+
 
                 if (user.EquippedItem == null)
                     user.EquippedItem = new List<Item>();
@@ -441,72 +433,72 @@ namespace fyserver
                 return Results.Ok(item);
             });
             // 6. 匹配系统
-           app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
-            {
-                var user = await GlobalState.users.GetByIdAsync(lobbyPlayer.PlayerId);
-                if (user == null || user.Name == "<anon>")
-                {
-                    // TODO: WebSocket断开连接消息
-                    //context.Connection.Close();
-                    return Results.BadRequest("请改名");
-                }
+            app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
+             {
+                 var user = await GlobalState.users.GetByIdAsync(lobbyPlayer.PlayerId);
+                 if (user == null || user.Name == "<anon>")
+                 {
+                     // TODO: WebSocket断开连接消息
+                     //context.Connection.Close();
+                     return Results.BadRequest("请改名");
+                 }
 
-                
 
-                // 检查卡组有效性（简化）
-                if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
-                {
-                   // context.Connection.Close();
-                    return Results.BadRequest("无效卡组");
-                }
 
-                // 对战码匹配
-                if (lobbyPlayer.ExtraData.StartsWith("battle_code:"))
-                {
-                    var code = lobbyPlayer.ExtraData;
-                    if (!config.appconfig.BattleCodePlayers.ContainsKey(code))
-                        config.appconfig.BattleCodePlayers[code] = new List<LobbyPlayer>();
+                 // 检查卡组有效性（简化）
+                 if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
+                 {
+                     // context.Connection.Close();
+                     return Results.BadRequest("无效卡组");
+                 }
 
-                    var players = config.appconfig.BattleCodePlayers[code];
-                    players.Add(lobbyPlayer);
+                 // 对战码匹配
+                 if (lobbyPlayer.ExtraData.StartsWith("battle_code:"))
+                 {
+                     var code = lobbyPlayer.ExtraData;
+                     if (!config.appconfig.BattleCodePlayers.ContainsKey(code))
+                         config.appconfig.BattleCodePlayers[code] = new List<LobbyPlayer>();
 
-                    if (players.Count >= 2)
-                    {
-                        var matchId = Random.Shared.Next(100000, 999999);
-                        var matchInfo = new MatchInfo(matchId, players[0], players[1]);
-                        players.RemoveAt(0);
-                        players.RemoveAt(0);
-                        config.appconfig.MatchedPairs[matchId] = matchInfo;
-                    }
-                }
-                // 普通匹配
-                else if (lobbyPlayer.ExtraData == "")
-                {
-                    config.appconfig.WaitingPlayers1.Add(lobbyPlayer);
-                    if (config.appconfig.WaitingPlayers1.Count >= 2)
-                    {
-                        var matchId = Random.Shared.Next(100000, 999999);
-                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
-                        config.appconfig.WaitingPlayers1.RemoveAt(0);
-                        config.appconfig.WaitingPlayers1.RemoveAt(0);
-                        config.appconfig.MatchedPairs[matchId] = matchInfo;
-                    }
-                }
-                else
-                {
-                    config.appconfig.WaitingPlayers2.Add(lobbyPlayer);
-                    if (config.appconfig.WaitingPlayers2.Count >= 2)
-                    {
-                        var matchId = Random.Shared.Next(100000, 999999);
-                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1]);
-                        config.appconfig.WaitingPlayers2.RemoveAt(0);
-                        config.appconfig.WaitingPlayers2.RemoveAt(0);
-                        config.appconfig.MatchedPairs[matchId] = matchInfo;
-                    }
-                }
+                     var players = config.appconfig.BattleCodePlayers[code];
+                     players.Add(lobbyPlayer);
 
-                return Results.Ok("OK");
-            });
+                     if (players.Count >= 2)
+                     {
+                         var matchId = Random.Shared.Next(100000, 999999);
+                         var matchInfo = new MatchInfo(matchId, players[0], players[1]);
+                         players.RemoveAt(0);
+                         players.RemoveAt(0);
+                         config.appconfig.MatchedPairs[matchId] = matchInfo;
+                     }
+                 }
+                 // 普通匹配
+                 else if (lobbyPlayer.ExtraData == "")
+                 {
+                     config.appconfig.WaitingPlayers1.Add(lobbyPlayer);
+                     if (config.appconfig.WaitingPlayers1.Count >= 2)
+                     {
+                         var matchId = Random.Shared.Next(100000, 999999);
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
+                         config.appconfig.WaitingPlayers1.RemoveAt(0);
+                         config.appconfig.WaitingPlayers1.RemoveAt(0);
+                         config.appconfig.MatchedPairs[matchId] = matchInfo;
+                     }
+                 }
+                 else
+                 {
+                     config.appconfig.WaitingPlayers2.Add(lobbyPlayer);
+                     if (config.appconfig.WaitingPlayers2.Count >= 2)
+                     {
+                         var matchId = Random.Shared.Next(100000, 999999);
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1]);
+                         config.appconfig.WaitingPlayers2.RemoveAt(0);
+                         config.appconfig.WaitingPlayers2.RemoveAt(0);
+                         config.appconfig.MatchedPairs[matchId] = matchInfo;
+                     }
+                 }
+
+                 return Results.Ok("OK");
+             });
 
             //app.MapDelete("/lobbyplayers", (LobbyPlayer lobbyPlayer) =>
             //{
@@ -563,7 +555,7 @@ namespace fyserver
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    
+
                     await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
@@ -661,7 +653,7 @@ namespace fyserver
             });
             app.MapGet("/config", (HttpContext context) =>
             {
-                return Results.Ok(new CloseConfig(XserverClosed:"路几把"));
+                return Results.Ok(new CloseConfig(XserverClosed: "路几把"));
             });// 3. 玩家管理
             app.MapPost("/matches/v2/{id}/actions", async (int id, MatchAction matchAction, HttpContext context) =>
             {
@@ -677,7 +669,7 @@ namespace fyserver
                 {
                     // TODO: WebSocket发送封禁消息
                     user.Banned = true;
-                    
+
                     await GlobalState.users.SaveUserAsync(user);
                     match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                     return Results.Ok(new { });
@@ -817,14 +809,14 @@ namespace fyserver
             // 10. 管理API端点
             app.MapGet("/admin/GlobalState.users/count", async () =>
             {
-                var users= await GlobalState.users.GetAllUsersAsync();
+                var users = await GlobalState.users.GetAllUsersAsync();
                 return Results.Ok(new { count = users.Count });
             });
 
             app.MapGet("/admin/users/list", async () =>
             {
                 var Users = await GlobalState.users.GetAllUsersAsync();
-                var simplifiedUsers =Users.Select(u => new
+                var simplifiedUsers = Users.Select(u => new
                 {
                     u.Id,
                     u.UserName,
@@ -855,7 +847,7 @@ namespace fyserver
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = true;
-                
+
                 await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} banned successfully" });
             });
@@ -867,7 +859,7 @@ namespace fyserver
                     return Results.NotFound($"User with ID {userId} not found");
 
                 user.Banned = false;
-                
+
                 await GlobalState.users.SaveUserAsync(user);
                 return Results.Ok(new { message = $"User {userId} unbanned successfully" });
             });

@@ -17,7 +17,7 @@ public class FasterKvService : IDisposable
     };
 
     // 构造函数：初始化 FASTER KV
-    public FasterKvService(string logDirectory = "./faster-log", bool verboseLogging = true)
+    public FasterKvService(string logDirectory = "./faster-log", bool verboseLogging = false)
     {
         _verboseLogging = verboseLogging;
 

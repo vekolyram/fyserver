@@ -1,16 +1,19 @@
 using fyserver;
-using Newtonsoft.Json;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 config.appconfig.read();
 new ws().StartWsServerAsync();
  new http().StartHttpServer();
-
+var options = new JsonSerializerOptions
+{
+PropertyNamingPolicy= JsonNamingPolicy.SnakeCaseLower,
+};
 ClientWebSocket webSocket = new ClientWebSocket();
 await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs()), CancellationToken.None);
-string message = JsonConvert.SerializeObject(new msg() { message = "", channel = "ping" });
+string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Message: "ss", Channel: "ping"), options);
 ws.SendString(webSocket, message);
 var buffer = new byte[1024];
 List<byte> bs = new List<byte>();

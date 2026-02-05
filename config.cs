@@ -24,11 +24,11 @@ namespace fyserver
         //public List<KeyValuePair<User, string>>? clients;
         public string getAddressWs()
         {
-            return "ws://127.0.0.1:" + portWs.ToString();
+            return "ws://127.0.0.1:"+portWs;
         }
         public string getAddressWsR()
         {
-            return "ws://" + ip + ":" + portWs.ToString();
+            return $"ws://{ip}:{portWs}";
         }
         public string getAddressHttp()
         {
@@ -41,12 +41,10 @@ namespace fyserver
         public async Task<Config> getConfigAsync(string auth)
         {
             CurrentUser? currentUser = null;
+                string authToken = auth["JWT ".Length..];
             if (auth != "1939Mother")
             {
-                string authToken = auth["JWT ".Length..];
                 User? user = await GlobalState.users.GetByUserNameAsync(authToken);
-                Console.WriteLine("getConfigAsync: authToken=" + authToken);
-                Console.WriteLine("getConfigAsync: user=" + (user == null ? "null" : user.UserName));
                 currentUser = new CurrentUser(
                     // TS 对应: "client_id": user.id
                     ClientId: user.Id,
@@ -57,15 +55,15 @@ namespace fyserver
                     Iat: 1752328020,
                     // TS 对应: "identity_id": user.id
                     IdentityId: user.Id,
-                    Iss: "",
-                    Jti: "",
+                    Iss: "fyserver",
+                    Jti: "114514",
                     // TS 对应: "language": user.locale
                     Language: user.Locale,
                     Payment: "notavailable",
                     // TS 对应: "player_id": user.id
                     // 注意：你的 Record 定义 PlayerId 是 string，所以这里要 ToString ()
                     PlayerId: user.Id.ToString(),
-                    Provider: "device",
+                    Provider: "device_id",
                     Roles: new List<string>(),
                     Tier: "LIVE",
                     // TS 对应: "user_id": user.id
@@ -82,9 +80,9 @@ namespace fyserver
                            Lobbyplayers: $"{getAddressHttpR()}/lobbyplayers",
                            Matches: $"{getAddressHttpR()}/matches",
                            Matches2: $"{getAddressHttpR()}/matches/v2/",
-                           MyDraft: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/draft/{auth["Bearer ".Length..]}",
-                           MyItems: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/items/{auth["Bearer ".Length..]}",
-                           MyPlayer: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/players/{auth["Bearer ".Length..]}",
+                           MyDraft: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/draft/{authToken}",
+                           MyItems: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/items/{authToken}",
+                           MyPlayer: string.IsNullOrEmpty(auth) ? "" : $"{getAddressHttpR()}/players/{authToken}",
                            Players: $"{getAddressHttpR()}/players",
                            Purchase: $"{getAddressHttpR()}/store/v2/txn",
                            Root: getAddressHttpR(),
@@ -104,9 +102,9 @@ namespace fyserver
                 String file = File.ReadAllText("./setting.json");
                 var config = JsonConvert.DeserializeObject<config>(file);
                 this.bancheat = config.bancheat;
-                this.portWs = config.portWs;
                 this.portHttp = config.portHttp;
                 this.ip = config.ip;
+                this.portWs = config.portWs;
             }
             else
             {

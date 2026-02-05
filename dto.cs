@@ -3,10 +3,19 @@ namespace fyserver
 {
     public class a
     {
-        public static readonly LibraryResponse Library = new(
+        class Card
+        {
+            public string card { get; set; }
+            public string deck_code_id { get; set; }
+            public int ID { get; set; }
+        }
+        public static LibraryResponse Library = new(
             new List<LibraryItem>
             {
-            new("card_unit_seahawk", 1, 0, 2001, 0)
+            //new("card_unit_seahawk", 1, 0, 2001, 0),
+            //new("card_wildcard_elite",99,0,1065,0),
+            //  new("card_wildcard_limited",99,0,1071,0),
+            //new("card_wildcard_special",99,0,1076,0)
             },
             new List<object>()
         );
@@ -20,23 +29,20 @@ namespace fyserver
     {
         { "v7", new CardLookup("card_unit_1st_airborne", "v7", 2001) }
     };
+        public static void InitLibrary(String Path) {
+            string a = File.ReadAllText(Path);
+            List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(a);
+            foreach (var c in cs) { 
+                Library.Cards.Add(new LibraryItem(c.card, 1, 1, c.ID, 0));
+            }
+        }
     }
-    public record msg
-    {
-        public string match_id = "";
-        public string message = "";
-        public string channel = "";
-        public string context = "";
-        public long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        public int sender;
-        public string receiver = "";
-    }
-    public record Action
-    {
-        public string action;
-        public string value;
-        public string deck_code;
-    }
+    public record DeckAction
+    (
+         string Action,
+         string Value,
+         string DeckCode
+    );
     // Match DTOs as records
     public record LobbyPlayer(
         int PlayerId,
@@ -245,15 +251,14 @@ namespace fyserver
         List<Item> EquippedItems,
         List<Item> Items
     );
-
     // WebSocket messages as records
     public record WebSocketMessage(
-        string Message,
-        string Channel,
-        string Context,
-        DateTime Timestamp,
-        string Sender,
-        string Receiver,
+        long Timestamp,
+        string Message = "",
+        string Channel = "",
+        string Sender = "",
+        string Receiver = "",
+        string Context = "",
         int? MatchId = null
     );
 
@@ -385,7 +390,7 @@ namespace fyserver
             var list = _db.GetAllByPrefix<User>("user:id:");
             return Task.FromResult(list);
         }
-        
+
         public void Dispose()
         {
             if (_ownsConnection)
