@@ -33,7 +33,7 @@ namespace fyserver
             string a = File.ReadAllText(Path);
             List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(a);
             foreach (var c in cs) { 
-                Library.Cards.Add(new LibraryItem(c.card, 1, 1, c.ID, 0));
+                Library.Cards.Add(new LibraryItem(c.card, 4, 0, c.ID, 0));
             }
         }
     }

@@ -49,10 +49,10 @@ namespace fyserver
                     // TS 对应: "client_id": user.id
                     ClientId: user.Id,
                     // TS 对应: "exp": user.id
-                    Exp: user.Id,
+                    Exp: 1770289815,
                     // TS 对应: "external_id": auth.slice (8) -> 即用户名
                     ExternalId: authToken,
-                    Iat: 1752328020,
+                    Iat: 1770289815,
                     // TS 对应: "identity_id": user.id
                     IdentityId: user.Id,
                     Iss: "fyserver",
