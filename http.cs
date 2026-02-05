@@ -871,7 +871,6 @@ namespace fyserver
                 {
                     context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                     context.Response.ContentType = "application/json";
-
                     await context.Response.WriteAsJsonAsync(new ErrorResponse(
                         Error: "Internal server error",
                         Message: "An unexpected error occurred",
@@ -879,7 +878,7 @@ namespace fyserver
                     ));
                 });
             });
-
+            
             // 12. 未找到路由的处理
             app.UseStatusCodePages(async statusCodeContext =>
             {
