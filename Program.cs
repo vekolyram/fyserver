@@ -5,8 +5,9 @@ using System.Text.Json;
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 config.appconfig.read();
+new http().StartHttpServer();
+await Task.Delay(2000);
 new ws().StartWsServerAsync();
- new http().StartHttpServer();
 var options = new JsonSerializerOptions
 {
 PropertyNamingPolicy= JsonNamingPolicy.SnakeCaseLower,
@@ -30,4 +31,3 @@ if (result.EndOfMessage)
     bs = new List<byte>();
 }
 await webSocket.CloseAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
-Console.ReadLine();

@@ -10,6 +10,9 @@ namespace fyserver
         async public Task StartHttpServer()
         {
           a.InitLibrary("./deckCodeIDsTable2.json","");
+            Console.ForegroundColor= ConsoleColor.Green;
+
+            Console.ForegroundColor = ConsoleColor.White;
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
             builder.Services.AddEndpointsApiExplorer();
@@ -943,6 +946,9 @@ namespace fyserver
             //Console.WriteLine(app.Map);
             Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine("正在启动http服务器");
+            Console.WriteLine("等待两秒确保初始化成功");
+            if(File.Exists("./YCDR"))
+            Console.WriteLine("发现持久化数据，已加载");
             Console.ForegroundColor = ConsoleColor.White;
             await app.RunAsync();
 

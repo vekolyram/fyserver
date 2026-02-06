@@ -24,7 +24,7 @@ namespace fyserver
                 {
                 };
                 // 当 WebSocket 连接关闭时，触发 OnClose 事件，并输出 "Close!" 到控制台。
-                socket.OnClose = () => GlobalState.users.Record2();
+                socket.OnClose = () => Console.WriteLine("Close!");
                 // 当服务器接收到来自客户端的消息时，触发 OnMessage 事件。
                 // 这个事件的处理程序接收一个参数 message，它包含了从客户端接收到的消息。
                 // 然后，使用 socket.Send 方法将接收到的消息发送回客户端。

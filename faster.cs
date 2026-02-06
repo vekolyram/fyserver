@@ -1,4 +1,5 @@
 ﻿using FASTER.core;
+using fyserver;
 using System.Text.Json;
 
 public class FasterKvService : IDisposable
@@ -7,7 +8,6 @@ public class FasterKvService : IDisposable
     private ClientSession<string, string, string, string, Empty, IFunctions<string, string, string, string, Empty>> _session;
     private const string LogDirectory = "./faster-log";
     private readonly bool _verboseLogging;
-    public string Record = "Faster";
     // System.Text.Json 序列化选项
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -240,6 +240,7 @@ public class FasterKvService : IDisposable
     }
     public void Dispose()
     {
+         Checkpoint();
         _session?.Dispose();
         _fasterKv?.Dispose();
     }
