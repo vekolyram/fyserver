@@ -17,22 +17,52 @@ namespace fyserver
             {
                 options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
             });
-            // 配置JSON序列化
+            builder.Services.AddRouting();
             var app = builder.Build();
-            // Configure the HTTP request pipeline.
+
+            // 路径规范化中间件 - 处理双斜杠问题
+            app.Use(async (context, next) =>
+            {
+                var path = context.Request.Path.Value;
+                if (!string.IsNullOrEmpty(path) && path.Contains("//"))
+                {
+                    while (path.Contains("//"))
+                    {
+                        path = path.Replace("//", "/");
+                    }
+                    context.Request.Path = path;
+                }
+                await next();
+            });
+
+            app.UseRouting();
+
             if (app.Environment.IsDevelopment())
             {
                 app.MapOpenApi();
             }
+
+            // 日志和响应头处理
             app.Use(async (context, next) =>
             {
+                Console.WriteLine($"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+                await next();
                 if (context.Response.ContentType?.Contains("charset") == true)
                 {
                     context.Response.ContentType = context.Response.ContentType.Replace("; charset=utf-8", "");
                 }
-                Console.WriteLine($"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+            });
+
+            app.Use(async (context, next) =>
+            {
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers["Content-Type"] = context.Response.Headers["Content-Type"].ToString().Replace("; charset=utf-8", "");
+                    return Task.CompletedTask;
+                });
                 await next();
             });
+
             // 辅助方法
             int GetPlayerIdFromAuth(HttpContext context)
             {
@@ -237,40 +267,97 @@ namespace fyserver
                 return Results.Ok(await config.appconfig.getConfigAsync(auth));
             });// 3. 玩家管理
             //TODO: 完善entitlements接口,用于处理所有权
-            //TODO: 完善fp接口,用于处理商店
+
+            // FP接口 - 前端展示（Front Page）
             app.MapGet("/fp/", (HttpContext context) =>
             {
-                var ro = new FPResponseObject();
-                ro.Content = new FPResponseOO(BannerText: new(), Heading: new("JJC", 10), Icon: new() { ["IconUrl"] = "https://img.cdn1.vip/i/6984b654e6b78_1770305108.jpg" },ImageUrl: "https://helsinki-test.s3.eu-west-1.amazonaws.com/box-2/box_draft_edge_unclesam.jpg", Link:"kards:draft",Priority:3,Type:1,Slot:1,SubHeading:new());
-                ro.Id = 31;
-                var r = new FPResponse(Elements:new List<FPResponseObject>() { ro },Targeted:new());
-                return Results.Ok(r);
+                var fpConfig = GlobalState.GetFrontPageConfig();
+                var elements = new List<FPResponseObject>();
+                var targeted = new List<FPResponseObject>();
+
+                // 从配置文件读取前端展示元素
+                foreach (var fpElement in fpConfig.FrontPage)
+                {
+                    var element = new FPResponseObject
+                    {
+                        Content = new FPResponseOO(
+                            BannerText: new FPText(fpElement.Content.BannerText.Text, fpElement.Content.BannerText.FontSize),
+                            Heading: new FPText(fpElement.Content.Heading.Text, fpElement.Content.Heading.FontSize),
+                            SubHeading: new FPText(fpElement.Content.SubHeading.Text, fpElement.Content.SubHeading.FontSize),
+                            Icon: fpElement.Content.Icon,
+                            ImageUrl: fpElement.Content.ImageUrl,
+                            Link: fpElement.Content.Link,
+                            Priority: fpElement.Content.Priority,
+                            Type: fpElement.Content.Type,
+                            Slot: fpElement.Content.Slot
+                        ),
+                        ElementId = fpElement.ElementId,
+                        StartDate = fpElement.StartDate,
+                        EndDate = fpElement.EndDate,
+                        IsPublished = fpElement.IsPublished,
+                        IsTargeted = fpElement.IsTargeted
+                    };
+                    elements.Add(element);
+                }
+
+                // 读取针对性推送内容
+                if (fpConfig.FrontPageTargeted != null)
+                {
+                    foreach (var fpElement in fpConfig.FrontPageTargeted)
+                    {
+                        var element = new FPResponseObject
+                        {
+                            Content = new FPResponseOO(
+                                BannerText: new FPText(fpElement.Content.BannerText.Text, fpElement.Content.BannerText.FontSize),
+                                Heading: new FPText(fpElement.Content.Heading.Text, fpElement.Content.Heading.FontSize),
+                                SubHeading: new FPText(fpElement.Content.SubHeading.Text, fpElement.Content.SubHeading.FontSize),
+                                Icon: fpElement.Content.Icon,
+                                ImageUrl: fpElement.Content.ImageUrl,
+                                Link: fpElement.Content.Link,
+                                Priority: fpElement.Content.Priority,
+                                Type: fpElement.Content.Type,
+                                Slot: fpElement.Content.Slot
+                            ),
+                            ElementId = fpElement.ElementId,
+                            StartDate = fpElement.StartDate,
+                            EndDate = fpElement.EndDate,
+                            IsPublished = fpElement.IsPublished,
+                            IsTargeted = fpElement.IsTargeted
+                        };
+                        targeted.Add(element);
+                    }
+                }
+
+                var response = new FPResponse(
+                    Elements: elements,
+                    Targeted: targeted,
+                    Changed: true,
+                    Message: "OK",
+                    StatusCode: 200
+                );
+
+                return Results.Ok(response);
             });
-            //TODO：http://kards.live.1939api.com//store/v2/?provider=xsolla HTTP/1.1，用于处理商店
-            //
-            //
-            app.Use(async (context, next) =>
+
+            // Store V2接口 - 商店数据
+            app.MapGet("/store/v2/", (HttpContext context, string? provider) =>
             {
-                // 在处理请求之前或之后添加
-                context.Response.OnStarting(() =>
-                {
-                    context.Response.Headers["Content-Type"] = context.Response.Headers["Content-Type"].ToString().Replace("; charset=utf-8", "");
-                    return Task.CompletedTask;
-                });
-                var originalPath = context.Request.Path;
-                var normalizedPath = originalPath.Value.Replace("//", "/");
-                if (string.IsNullOrEmpty(normalizedPath))
-                {
-                    normalizedPath = "/";
-                }
-                Console.WriteLine(normalizedPath);
-                if (originalPath.Value != normalizedPath)
-                {
-                    context.Request.Path = normalizedPath;
-                }
-                await next();
+                var storeConfig = GlobalState.GetStoreConfig();
+                var now = DateTime.UtcNow;
+                var timestamp = (now - new DateTime(1970, 1, 1)).TotalSeconds;
+
+                var response = new StoreResponse(
+                    Currency: storeConfig.Currency,
+                    Groups: storeConfig.Groups,
+                    AlwaysFeatured: storeConfig.AlwaysFeatured,
+                    Message: $"Offers for {now:yyyy-MM-ddTHH:mm:ss.ffffffZ}",
+                    Status: 200,
+                    Ts: timestamp
+                );
+
+                return Results.Ok(response);
             });
-            // 中间件：规范化路径（移除多余斜杠）
+
             app.MapGet("/entitlements/{id}", (HttpContext context) =>
             {
                 List<Entitlement> e = new();
@@ -369,6 +456,11 @@ namespace fyserver
                             break;
                         case "change_card_back":
                             deck.CardBack = changeDeck.Name;
+                            deck.ModifyDate = DateTime.Now;
+                            break;
+                        case "make_favorite":
+                            user.Name = deck.Name;
+                            deck.Favorite = true;
                             deck.ModifyDate = DateTime.Now;
                             break;
                     }

@@ -50,15 +50,15 @@ namespace fyserver
     {
         public FPResponseOO Content { get; set; }
         [JsonPropertyName("elementId")]
-        public int Id { get; set; }
+        public int ElementId { get; set; }
         [JsonPropertyName("endDate")]
-        public string EndDate = "0001-01-01T00:00:00Z";
+        public string EndDate { get; set; } = "0001-01-01T00:00:00Z";
         [JsonPropertyName("startDate")]
-        public string StartDate = "9999-01-01T00:00:00Z";
+        public string StartDate { get; set; } = "9999-01-01T00:00:00Z";
         [JsonPropertyName("isPublished")]
-        public bool IsPublished = true;
+        public bool IsPublished { get; set; } = true;
         [JsonPropertyName("isTargeted")]
-        public bool IsTargeted = false;
+        public bool IsTargeted { get; set; } = false;
     };
     public record FPResponseOO(
     FPText BannerText,
@@ -866,5 +866,71 @@ int StatusCode = 200
         int UsaLevelClaimed,
         int UsaXp,
         int UserId
+    );
+
+    // 商店相关的数据模型
+    public record StoreItemData(
+        [property: JsonPropertyName("itemType")] string ItemType,
+        [property: JsonPropertyName("cardCount")] int? CardCount = null,
+        [property: JsonPropertyName("cardSet")] string? CardSet = null,
+        [property: JsonPropertyName("guaranteedGoldCards")] int? GuaranteedGoldCards = null,
+        [property: JsonPropertyName("name")] string? Name = null,
+        [property: JsonPropertyName("duration")] int? Duration = null,
+        [property: JsonPropertyName("isGold")] bool? IsGold = null,
+        [property: JsonPropertyName("month")] int? Month = null,
+        [property: JsonPropertyName("year")] int? Year = null
+    );
+
+    public record StoreItem(
+        [property: JsonPropertyName("data")] StoreItemData Data,
+        [property: JsonPropertyName("qty")] int Qty
+    );
+
+    public record StoreOffer(
+        [property: JsonPropertyName("offerId")] int OfferId,
+        [property: JsonPropertyName("offerName")] string OfferName,
+        [property: JsonPropertyName("title")] string Title,
+        [property: JsonPropertyName("description")] string? Description = null,
+        [property: JsonPropertyName("items")] List<StoreItem>? Items = null,
+        [property: JsonPropertyName("bonusItems")] List<StoreItem>? BonusItems = null,
+        [property: JsonPropertyName("diamonds")] int? Diamonds = null,
+        [property: JsonPropertyName("gold")] int? Gold = null,
+        [property: JsonPropertyName("real")] double? Real = null,
+        [property: JsonPropertyName("mainImage")] string? MainImage = null,
+        [property: JsonPropertyName("thumbnail")] string? Thumbnail = null,
+        [property: JsonPropertyName("smallThumb")] string? SmallThumb = null,
+        [property: JsonPropertyName("priority")] int? Priority = null,
+        [property: JsonPropertyName("limit")] int? Limit = null,
+        [property: JsonPropertyName("slotType")] string? SlotType = null,
+        [property: JsonPropertyName("slotValue")] string? SlotValue = null,
+        [property: JsonPropertyName("timed")] bool? Timed = null,
+        [property: JsonPropertyName("bonus")] bool? Bonus = null,
+        [property: JsonPropertyName("fulfilAfter")] string? FulfilAfter = null
+    );
+
+    public record StoreGroup(
+        [property: JsonPropertyName("groupId")] int GroupId,
+        [property: JsonPropertyName("group")] int Group,
+        [property: JsonPropertyName("startDate")] string StartDate,
+        [property: JsonPropertyName("endDate")] string EndDate,
+        [property: JsonPropertyName("offers")] List<StoreOffer> Offers,
+        [property: JsonPropertyName("hidden")] bool? Hidden = null
+    );
+
+    public record AlwaysFeaturedGroup(
+        [property: JsonPropertyName("group")] int Group,
+        [property: JsonPropertyName("groupId")] int GroupId,
+        [property: JsonPropertyName("startDate")] string StartDate,
+        [property: JsonPropertyName("endDate")] string EndDate,
+        [property: JsonPropertyName("offers")] List<StoreOffer> Offers
+    );
+
+    public record StoreResponse(
+        [property: JsonPropertyName("currency")] string Currency,
+        [property: JsonPropertyName("groups")] List<StoreGroup> Groups,
+        [property: JsonPropertyName("alwaysFeatured")] AlwaysFeaturedGroup AlwaysFeatured,
+        [property: JsonPropertyName("message")] string Message,
+        [property: JsonPropertyName("status")] int Status,
+        [property: JsonPropertyName("ts")] double Ts
     );
 }
