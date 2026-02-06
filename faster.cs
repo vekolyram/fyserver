@@ -45,7 +45,7 @@ public class FasterKvService : IDisposable
                 RemoveOutdated = true
             }
         );
-        if (File.Exists("./YYCD")) {
+        if (File.Exists("./YCDR")) {
             _fasterKv.Recover();
         }
         // 创建客户端会话
@@ -180,8 +180,8 @@ public class FasterKvService : IDisposable
         _session.CompletePending(true);
         if (_verboseLogging)
             Console.WriteLine("FasterKvService: CompletePending called for checkpoint.");
-        if (!File.Exists("./YYCD"))
-            File.Create("./YYCD").Dispose();
+        if (!File.Exists("./YCDR"))
+            File.Create("./YCDR").Dispose();
     }
 
     // 恢复到最后一次检查点
