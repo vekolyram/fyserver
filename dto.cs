@@ -677,12 +677,12 @@ namespace fyserver
             Right = right;
             LeftActions = new List<MatchAction>();
             RightActions = new List<MatchAction>();
-            PlayerStatusLeft = "not_done";
-            PlayerStatusRight = "not_done";
+            PlayerStatusLeft = GameConstants.NotDone;
+            PlayerStatusRight = GameConstants.NotDone;
             LeftMinactionid = 0;
             RightMinactionid = 0;
+            //MatchStartingInfo = new(new(left.PlayerId,"left",new(),config.appconfig.getAddressHttpR()+"/matches/v2/"+matchId+"/actions",0,0,left.DeckId,right.DeckId,1,matchId,"", config.appconfig.getAddressHttpR() + "/matches/v2/" +,DateTimeOffset.UtcNow.ToString(),new(),left.PlayerId,right.PlayerId,GameConstants.R),new());
         }
-
         public int MatchId { get; set; }
         public dynamic? MatchStartingInfo { get; set; }
         public LobbyPlayer? Left { get; set; }
@@ -737,7 +737,6 @@ namespace fyserver
         public const string Running = "running";
         public const string Finished = "finished";
 
-        // 派系列表
         public static readonly List<string> MainFactions = new() { "Germany", "Britain", "Soviet", "USA", "Japan" };
         public static readonly List<string> AllyFactions = new() { "Germany", "Britain", "Soviet", "USA", "Japan", "France", "Italy", "Poland", "Finland" };
 
