@@ -9,7 +9,6 @@ public class LiteDbService : IDisposable
     private const string CollectionName = "kv_store";
     private const string IdField = "_id";
     private const string PayloadField = "payload";
-
     // System.Text.Json 序列化选项
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {

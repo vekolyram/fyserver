@@ -443,7 +443,9 @@ namespace fyserver
     {
         private readonly FasterKvService _db;
         private readonly bool _ownsConnection;
-
+        public void Record2() {
+            _db.Checkpoint();
+        }
         // 构造函数
         public FasterUserStoreService(FasterKvService dbService)
         {

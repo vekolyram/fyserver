@@ -7,7 +7,7 @@ public class FasterKvService : IDisposable
     private ClientSession<string, string, string, string, Empty, IFunctions<string, string, string, string, Empty>> _session;
     private const string LogDirectory = "./faster-log";
     private readonly bool _verboseLogging;
-
+    public string Record = "Faster";
     // System.Text.Json 序列化选项
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -26,15 +26,14 @@ public class FasterKvService : IDisposable
         {
             Directory.CreateDirectory(logDirectory);
         }
-       
-        // 创建 FASTER KV 设置
-        var logSettings = new LogSettings
-        {
-            LogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.log")),
-            ObjectLogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.obj.log")),
-            PageSizeBits = 12, // 4KB 页面
-            MemorySizeBits = 20 // 1MB 内存
-        };
+            // 创建 FASTER KV 设置
+            var logSettings = new LogSettings
+            {
+                LogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.log")),
+                ObjectLogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.obj.log")),
+                PageSizeBits = 12, // 4KB 页面
+                MemorySizeBits = 20 // 1MB 内存
+            };
 
         // 初始化 FASTER KV
         _fasterKv = new FasterKV<string, string>(
@@ -46,7 +45,9 @@ public class FasterKvService : IDisposable
                 RemoveOutdated = true
             }
         );
-
+        if (File.Exists("./YYCD")) {
+            _fasterKv.Recover();
+        }
         // 创建客户端会话
         _session = _fasterKv.NewSession(new SimpleFunctions<string, string, Empty>());
     }
@@ -175,9 +176,12 @@ public class FasterKvService : IDisposable
     {
         // FASTER checkpointing API usage is environment/version dependent.
         // For now just ensure pending operations are completed.
+        _fasterKv.TakeFullCheckpointAsync(CheckpointType.Snapshot);
         _session.CompletePending(true);
         if (_verboseLogging)
             Console.WriteLine("FasterKvService: CompletePending called for checkpoint.");
+        if (!File.Exists("./YYCD"))
+            File.Create("./YYCD").Dispose();
     }
 
     // 恢复到最后一次检查点
@@ -234,7 +238,6 @@ public class FasterKvService : IDisposable
         if (_verboseLogging)
             Console.WriteLine("FasterKvService: Clear completed and instance recreated.");
     }
-
     public void Dispose()
     {
         _session?.Dispose();
