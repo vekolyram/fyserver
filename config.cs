@@ -1,13 +1,14 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Concurrent;
-
+using System.Text.Json;
+using System.Text.Json.Serialization;
 namespace fyserver
 {
     public static class GlobalState
     {
         public static FasterUserStoreService users = new FasterUserStoreService();
         private static StoreConfig? _storeConfig;
-        private static FrontPageConfig? _frontPageConfig;
+        private static FPResponse? _frontPageConfig;
 
         public static StoreConfig GetStoreConfig()
         {
@@ -32,7 +33,7 @@ namespace fyserver
             return _storeConfig;
         }
 
-        public static FrontPageConfig GetFrontPageConfig()
+        public static FPResponse GetFrontPageConfig()
         {
             if (_frontPageConfig == null)
             {
@@ -40,15 +41,16 @@ namespace fyserver
                 if (File.Exists(configPath))
                 {
                     string json = File.ReadAllText(configPath);
-                    _frontPageConfig = JsonConvert.DeserializeObject<FrontPageConfig>(json);
+                    _frontPageConfig = System.Text.Json.JsonSerializer.Deserialize<FPResponse>(json);
                 }
                 else
                 {
-                    _frontPageConfig = new FrontPageConfig
-                    {
-                        FrontPage = new List<FrontPageElement>(),
-                        FrontPageTargeted = new List<FrontPageElement>()
-                    };
+                    _frontPageConfig = new FPResponse
+                    (
+                        Elements : new List<FPResponseObject>() { new() { Content = new(new(), new(), new(),"","",0, new(), 0,0) } },
+                        Targeted : new List<FPResponseObject>()
+                    );
+                    //File.WriteAllText(configPath, System.Text.Json.JsonSerializer.Serialize(_frontPageConfig));
                 }
             }
             return _frontPageConfig;
@@ -75,75 +77,6 @@ namespace fyserver
 
         [JsonProperty("alwaysFeatured")]
         public AlwaysFeaturedGroup AlwaysFeatured { get; set; }
-    }
-
-    public class FrontPageConfig
-    {
-        [JsonProperty("frontPage")]
-        public List<FrontPageElement> FrontPage { get; set; } = new();
-
-        [JsonProperty("frontPageTargeted")]
-        public List<FrontPageElement> FrontPageTargeted { get; set; } = new();
-    }
-
-    public class FrontPageElement
-    {
-        [JsonProperty("elementId")]
-        public int ElementId { get; set; }
-
-        [JsonProperty("startDate")]
-        public string StartDate { get; set; } = "";
-
-        [JsonProperty("endDate")]
-        public string EndDate { get; set; } = "";
-
-        [JsonProperty("isPublished")]
-        public bool IsPublished { get; set; } = true;
-
-        [JsonProperty("isTargeted")]
-        public bool IsTargeted { get; set; } = false;
-
-        [JsonProperty("content")]
-        public FrontPageContent Content { get; set; }
-    }
-
-    public class FrontPageContent
-    {
-        [JsonProperty("bannerText")]
-        public FPTextConfig BannerText { get; set; }
-
-        [JsonProperty("heading")]
-        public FPTextConfig Heading { get; set; }
-
-        [JsonProperty("subHeading")]
-        public FPTextConfig SubHeading { get; set; }
-
-        [JsonProperty("icon")]
-        public Dictionary<string, string> Icon { get; set; }
-
-        [JsonProperty("imageUrl")]
-        public string ImageUrl { get; set; } = "";
-
-        [JsonProperty("link")]
-        public string Link { get; set; } = "";
-
-        [JsonProperty("priority")]
-        public int Priority { get; set; }
-
-        [JsonProperty("type")]
-        public int Type { get; set; }
-
-        [JsonProperty("slot")]
-        public int Slot { get; set; }
-    }
-
-    public class FPTextConfig
-    {
-        [JsonProperty("text")]
-        public string Text { get; set; } = "";
-
-        [JsonProperty("fontSize")]
-        public int FontSize { get; set; }
     }
     public class config
     {

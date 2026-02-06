@@ -27,6 +27,9 @@
     <Content Update="config\frontpage.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Update="config\serverOptions.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="config\store.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -34,5 +37,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ProjectExtensions><VisualStudio><UserProperties /></VisualStudio></ProjectExtensions>
 
 </Project>

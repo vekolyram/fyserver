@@ -9,7 +9,7 @@ namespace fyserver
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         async public Task StartHttpServer()
         {
-          //  a.InitLibrary("./deckCodeIDsTable2.json");
+          a.InitLibrary("./deckCodeIDsTable2.json","");
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
             builder.Services.AddEndpointsApiExplorer();
@@ -195,7 +195,7 @@ namespace fyserver
                     Rewards: new List<object>(),
                     SeasonEnd: "2025-08-01T00:00:00Z",
                     SeasonWins: 9999,
-                    ServerOptions: JsonConvert.SerializeObject(new ServerOptions() { Websocketurl = config.appconfig.getAddressWs() }),
+                    ServerOptions: File.Exists("./config/serverOptions.json") ? File.ReadAllText("./config/serverOptions.json"):"",//'{"nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}}, "appscale_desktop_default": 1.0, "appscale_desktop_max": 1.4, "appscale_mobile_default": 1.4, "appscale_mobile_max": 1.4, "appscale_mobile_min": 1.0, "appscale_tablet_min": 1.0, "battle_wait_time": 60, "nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}},"websocketurl": "ws://127.0.0.1:5232","homefront_date":"2025.11.27-09.00.00"}',
                     ServerTime: DateTime.UtcNow.ToString("yyyy.MM.dd-HH.mm.ss"),
                     SovietLevel: 500,
                     SovietLevelClaimed: 500,
@@ -272,71 +272,8 @@ namespace fyserver
             app.MapGet("/fp/", (HttpContext context) =>
             {
                 var fpConfig = GlobalState.GetFrontPageConfig();
-                var elements = new List<FPResponseObject>();
-                var targeted = new List<FPResponseObject>();
 
-                // 从配置文件读取前端展示元素
-                foreach (var fpElement in fpConfig.FrontPage)
-                {
-                    var element = new FPResponseObject
-                    {
-                        Content = new FPResponseOO(
-                            BannerText: new FPText(fpElement.Content.BannerText.Text, fpElement.Content.BannerText.FontSize),
-                            Heading: new FPText(fpElement.Content.Heading.Text, fpElement.Content.Heading.FontSize),
-                            SubHeading: new FPText(fpElement.Content.SubHeading.Text, fpElement.Content.SubHeading.FontSize),
-                            Icon: fpElement.Content.Icon,
-                            ImageUrl: fpElement.Content.ImageUrl,
-                            Link: fpElement.Content.Link,
-                            Priority: fpElement.Content.Priority,
-                            Type: fpElement.Content.Type,
-                            Slot: fpElement.Content.Slot
-                        ),
-                        ElementId = fpElement.ElementId,
-                        StartDate = fpElement.StartDate,
-                        EndDate = fpElement.EndDate,
-                        IsPublished = fpElement.IsPublished,
-                        IsTargeted = fpElement.IsTargeted
-                    };
-                    elements.Add(element);
-                }
-
-                // 读取针对性推送内容
-                if (fpConfig.FrontPageTargeted != null)
-                {
-                    foreach (var fpElement in fpConfig.FrontPageTargeted)
-                    {
-                        var element = new FPResponseObject
-                        {
-                            Content = new FPResponseOO(
-                                BannerText: new FPText(fpElement.Content.BannerText.Text, fpElement.Content.BannerText.FontSize),
-                                Heading: new FPText(fpElement.Content.Heading.Text, fpElement.Content.Heading.FontSize),
-                                SubHeading: new FPText(fpElement.Content.SubHeading.Text, fpElement.Content.SubHeading.FontSize),
-                                Icon: fpElement.Content.Icon,
-                                ImageUrl: fpElement.Content.ImageUrl,
-                                Link: fpElement.Content.Link,
-                                Priority: fpElement.Content.Priority,
-                                Type: fpElement.Content.Type,
-                                Slot: fpElement.Content.Slot
-                            ),
-                            ElementId = fpElement.ElementId,
-                            StartDate = fpElement.StartDate,
-                            EndDate = fpElement.EndDate,
-                            IsPublished = fpElement.IsPublished,
-                            IsTargeted = fpElement.IsTargeted
-                        };
-                        targeted.Add(element);
-                    }
-                }
-
-                var response = new FPResponse(
-                    Elements: elements,
-                    Targeted: targeted,
-                    Changed: true,
-                    Message: "OK",
-                    StatusCode: 200
-                );
-
-                return Results.Ok(response);
+                return Results.Ok(fpConfig);
             });
 
             // Store V2接口 - 商店数据
@@ -357,7 +294,10 @@ namespace fyserver
 
                 return Results.Ok(response);
             });
-
+            app.MapPost("/store/v2/txn", () =>
+            {
+                return Results.Ok();
+            });
             app.MapGet("/entitlements/{id}", (HttpContext context) =>
             {
                 List<Entitlement> e = new();

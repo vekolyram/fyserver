@@ -783,22 +783,6 @@ int StatusCode = 200
         string Code,
         string Description
     );
-
-    // 配置相关的record类型
-    public record ServerOptions(
-        int NuiMobile = 1,
-        Dictionary<string, Dictionary<string, List<string>>> ScalabilityOverride = null,
-        double AppscaleDesktopDefault = 1.0,
-        double AppscaleDesktopMax = 1.4,
-        double AppscaleMobileDefault = 1.4,
-        double AppscaleMobileMax = 1.4,
-        double AppscaleMobileMin = 1.0,
-        double AppscaleTabletMin = 1.0,
-        int BattleWaitTime = 60,
-        string Websocketurl = "",
-        string HomefrontDate = "2025.11.27-09.00.00"
-    );
-
     public record SessionResponse(
         string AchievementsUrl,
         List<object> AllKnockoutTourneys,
