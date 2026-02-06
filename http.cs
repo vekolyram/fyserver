@@ -271,11 +271,12 @@ namespace fyserver
             // FP接口 - 前端展示（Front Page）
             app.MapGet("/fp/", (HttpContext context) =>
             {
-                var fpConfig = GlobalState.GetFrontPageConfig();
-
-                return Results.Ok(fpConfig);
+                var fpt = File.Exists("./config/frontpage.json") ? File.ReadAllText("./config/frontpage.json") : "{}";
+                JsonDocument fp1 =JsonDocument.Parse(fpt);
+                return Results.Ok(
+                    fp1
+                    );
             });
-
             // Store V2接口 - 商店数据
             app.MapGet("/store/v2/", (HttpContext context, string? provider) =>
             {

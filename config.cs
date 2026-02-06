@@ -8,7 +8,7 @@ namespace fyserver
     {
         public static FasterUserStoreService users = new FasterUserStoreService();
         private static StoreConfig? _storeConfig;
-        private static FPResponse? _frontPageConfig;
+       // private static FPResponse? _frontPageConfig;
 
         public static StoreConfig GetStoreConfig()
         {
@@ -33,38 +33,38 @@ namespace fyserver
             return _storeConfig;
         }
 
-        public static FPResponse GetFrontPageConfig()
-        {
-            if (_frontPageConfig == null)
-            {
-                string configPath = "./config/frontpage.json";
-                if (File.Exists(configPath))
-                {
-                    string json = File.ReadAllText(configPath);
-                    _frontPageConfig = System.Text.Json.JsonSerializer.Deserialize<FPResponse>(json);
-                }
-                else
-                {
-                    _frontPageConfig = new FPResponse
-                    (
-                        Elements : new List<FPResponseObject>() { new() { Content = new(new(), new(), new(),"","",0, new(), 0,0) } },
-                        Targeted : new List<FPResponseObject>()
-                    );
-                    //File.WriteAllText(configPath, System.Text.Json.JsonSerializer.Serialize(_frontPageConfig));
-                }
-            }
-            return _frontPageConfig;
-        }
+        //public static FPResponse GetFrontPageConfig()
+        //{
+        //    if (_frontPageConfig == null)
+        //    {
+        //        string configPath = "./config/frontpage.json";
+        //        if (File.Exists(configPath))
+        //        {
+        //            string json = File.ReadAllText(configPath);
+        //            _frontPageConfig = System.Text.Json.JsonSerializer.Deserialize<FPResponse>(json);
+        //        }
+        //        else
+        //        {
+        //            _frontPageConfig = new FPResponse
+        //            (
+        //                Elements : new List<FPResponseObject>() { new() { Content = new(new(), new(), new(),"","",0, new(), 0,0) } },
+        //                Targeted : new List<FPResponseObject>()
+        //            );
+        //            //File.WriteAllText(configPath, System.Text.Json.JsonSerializer.Serialize(_frontPageConfig));
+        //        }
+        //    }
+        //    return _frontPageConfig;
+        //}
 
         public static void ReloadStoreConfig()
         {
             _storeConfig = null;
         }
 
-        public static void ReloadFrontPageConfig()
-        {
-            _frontPageConfig = null;
-        }
+        //public static void ReloadFrontPageConfig()
+        //{
+        //    _frontPageConfig = null;
+        //}
     }
 
     public class StoreConfig

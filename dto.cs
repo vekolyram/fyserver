@@ -46,43 +46,43 @@ namespace fyserver
          string Value,
          string DeckCode
     );
-    public class FPResponseObject
-    {
-        public FPResponseOO Content { get; set; }
-        [JsonPropertyName("elementId")]
-        public int ElementId { get; set; }
-        [JsonPropertyName("endDate")]
-        public string EndDate { get; set; } = "0001-01-01T00:00:00Z";
-        [JsonPropertyName("startDate")]
-        public string StartDate { get; set; } = "9999-01-01T00:00:00Z";
-        [JsonPropertyName("isPublished")]
-        public bool IsPublished { get; set; } = true;
-        [JsonPropertyName("isTargeted")]
-        public bool IsTargeted { get; set; } = false;
-    };
-    public record FPResponseOO(
-    FPText BannerText,
-    FPText Heading,
-    Dictionary<string, string> Icon,
-    string ImageUrl,
-    string Link,
-    int Priority,
-    FPText SubHeading,
-    int Type,
-    int Slot
-        );
-    public record FPText(
-           string Text="",
-           int FontSize=56
-        );
-    public record FPResponse
-(
-List<FPResponseObject> Elements,
-        List<FPResponseObject> Targeted,
-bool Changed=true,
-string Message="OK",
-int StatusCode = 200
-);
+//    public class FPResponseObject
+//    {
+//        public FPResponseOO Content { get; set; }
+//        [JsonPropertyName("elementId")]
+//        public int ElementId { get; set; }
+//        [JsonPropertyName("endDate")]
+//        public string EndDate { get; set; } = "0001-01-01T00:00:00Z";
+//        [JsonPropertyName("startDate")]
+//        public string StartDate { get; set; } = "9999-01-01T00:00:00Z";
+//        [JsonPropertyName("isPublished")]
+//        public bool IsPublished { get; set; } = true;
+//        [JsonPropertyName("isTargeted")]
+//        public bool IsTargeted { get; set; } = false;
+//    };
+//    public record FPResponseOO(
+//    FPText BannerText,
+//    FPText Heading,
+//    Dictionary<string, string> Icon,
+//    string ImageUrl,
+//    string Link,
+//    int Priority,
+//    FPText SubHeading,
+//    int Type,
+//    int Slot
+//        );
+//    public record FPText(
+//           string Text="",
+//           int FontSize=56
+//        );
+//    public record FPResponse
+//(
+//List<FPResponseObject> Elements,
+//        List<FPResponseObject> Targeted,
+//bool Changed=true,
+//string Message="OK",
+//int StatusCode = 200
+//);
     // Match DTOs as records
     public record LobbyPlayer(
         int PlayerId,
