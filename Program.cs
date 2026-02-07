@@ -1,16 +1,19 @@
 using fyserver;
+using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
+
 config.appconfig.read();
 new http().StartHttpServer();
 await Task.Delay(2000);
 new ws().StartWsServerAsync();
 var options = new JsonSerializerOptions
 {
-PropertyNamingPolicy= JsonNamingPolicy.SnakeCaseLower,
+    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
 };
 ClientWebSocket webSocket = new ClientWebSocket();
 await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs()), CancellationToken.None);
@@ -31,3 +34,10 @@ if (result.EndOfMessage)
     bs = new List<byte>();
 }
 await webSocket.CloseAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
+
+//var d = "%%24|060d0n1d1g1G1H1r1t1v7N7Y8U9g9n9qdDdEdze4efgsgtgvhThWjBjqowrht5tUtWw1w3wrwx;1b;;~;;;|0N1b";
+//d = d.Remove(0, 5);
+//var cards = new List<MatchCard>();
+//int cCount = 0;
+//int startId=1;
+//a.InitLibrary("./deckCodeIDsTable2.json", "");

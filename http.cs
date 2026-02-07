@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using System.Text.Json;
 
 namespace fyserver
@@ -48,7 +47,7 @@ namespace fyserver
             // 日志和响应头处理
             app.Use(async (context, next) =>
             {
-                Console.WriteLine($"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+                //Console.WriteLine($"{context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
                 await next();
                 if (context.Response.ContentType?.Contains("charset") == true)
                 {
@@ -67,12 +66,18 @@ namespace fyserver
             });
 
             // 辅助方法
-            int GetPlayerIdFromAuth(HttpContext context)
+            async Task<int> GetPlayerIdFromAuthAsync(HttpContext context)
             {
                 var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                User? a = null;
                 if (authHeader != null && authHeader.StartsWith("JWT "))
+                    a = await GlobalState.users.GetByUserNameAsync(authHeader["JWT ".Length..]);
+                else
+                    return 0;
+                if (a != null)
                 {
-                    return GlobalState.users.GetByUserNameAsync(authHeader["JWT ".Length..]).Id;
+                    Console.WriteLine($"Authorization header found: {authHeader["JWT ".Length..]}");
+                    return a.Id;
                 }
                 return 0;
             }
@@ -118,6 +123,7 @@ namespace fyserver
                 }
                 // 设置用户存储服务
                 //
+
                 var response = new SessionResponse(
                     AchievementsUrl: $"{addressHttp}/players/{user.Id}/achievements",
                     AllKnockoutTourneys: new List<object>(),
@@ -232,11 +238,11 @@ namespace fyserver
                 );
                 return Results.Ok(response);
             });
-
             // 在 http.cs 中
             async Task<User?> GetUserFromAuthAsync(HttpContext context)
             {
-                var playerId = GetPlayerIdFromAuth(context);
+                var playerId = await GetPlayerIdFromAuthAsync(context);
+                Console.WriteLine($"Extracted player ID from auth: {playerId}");
                 if (playerId > 0)
                 {
                     // 纯粹的数据获取，不需要注入 UserStore
@@ -248,7 +254,7 @@ namespace fyserver
             app.MapGet("/", async (HttpContext context) =>
             {
                 var auth = (context.Request.Headers["Authorization"].FirstOrDefault());
-                Console.WriteLine(auth);
+                // Console.WriteLine(auth);
                 if (auth == null)
                 {
                     auth = "JWT 1939Mother";
@@ -270,7 +276,6 @@ namespace fyserver
                 return Results.Ok(await config.appconfig.getConfigAsync(auth));
             });// 3. 玩家管理
             //TODO: 完善entitlements接口,用于处理所有权
-
             // FP接口 - 前端展示（Front Page）
             app.MapGet("/fp/", (HttpContext context) =>
             {
@@ -504,6 +509,7 @@ namespace fyserver
                          var matchInfo = new MatchInfo(matchId, players[0], players[1]);
                          players.RemoveAt(0);
                          players.RemoveAt(0);
+
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
                      }
                  }
@@ -513,14 +519,20 @@ namespace fyserver
                      Console.WriteLine("检测到匹配：" + lobbyPlayer.ToString());
                      config.appconfig.WaitingPlayers1.Add(lobbyPlayer);
                      Console.WriteLine($"当前有{config.appconfig.WaitingPlayers1.Count}");
-                     if (config.appconfig.WaitingPlayers1.Count >= 2)
+                     //单人对战
+                     if (config.appconfig.WaitingPlayers1.Count >= 1)
                      {
                          var matchId = Random.Shared.Next(100000, 999999);
-                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
-                         Console.WriteLine("信息为" + matchInfo.ToString());
+                         //var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
+                         //config.appconfig.MatchedPairs[matchId] = matchInfo;
+                         //config.appconfig.WaitingPlayers1.RemoveAt(0);
+                         //config.appconfig.WaitingPlayers1.RemoveAt(0);
+
+                         //上面的是双人，下面的是单人
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[0]);
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
                          config.appconfig.WaitingPlayers1.RemoveAt(0);
-                         config.appconfig.WaitingPlayers1.RemoveAt(0);
+                         Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                      }
                  }
                  else
@@ -533,6 +545,7 @@ namespace fyserver
                          config.appconfig.WaitingPlayers2.RemoveAt(0);
                          config.appconfig.WaitingPlayers2.RemoveAt(0);
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
+                         Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                      }
                  }
                  return Results.Ok("OK");
@@ -553,11 +566,12 @@ namespace fyserver
                 var user = await GetUserFromAuthAsync(context);
                 if (user == null)
                     return Results.Unauthorized();
+                Console.WriteLine("正在获取匹配信息，用户ID：" + user.Id);
                 MatchInfo? match = null;
-                Console.WriteLine(config.appconfig.MatchedPairs);
+                Console.WriteLine(config.appconfig.MatchedPairs.Count);
                 foreach (var kvp in config.appconfig.MatchedPairs)
                 {
-                        Console.WriteLine(kvp.Value.LeftDeck);
+                    Console.WriteLine(kvp.Value.LeftDeck);
                     if (string.IsNullOrEmpty(kvp.Value.WinnerSide) && kvp.Value.HasPlayer(user.Id))
                     {
                         match = kvp.Value;
@@ -569,526 +583,545 @@ namespace fyserver
                     return Results.Ok("null");
 
                 // TODO: 实现makeMatchStartingInfo逻辑
-                return Results.Ok(MakeMatchStartingInfo(match.MatchId,match));
+                return Results.Ok(await MakeMatchStartingInfo(user.Id, match));
             });
- async Task<MatchStartingInfo> MakeMatchStartingInfo(int myId, MatchInfo match)
-        {
-            var other = match.Left?.PlayerId == myId ? match.Right : match.Left;
-
-            if (match.MatchStartingInfo != null)
+            async Task<MatchStartingInfo> MakeMatchStartingInfo(int myId, MatchInfo match)
             {
-                // 更新现有信息
-                match.MatchStartingInfo.MatchAndStartingData.Match.ActionPlayerId = other?.PlayerId.ToString();
-                match.MatchStartingInfo.MatchAndStartingData.Match.ActionSide = other?.PlayerId == match.Left?.PlayerId ? "left" : "right";
+                var other = match.Left?.PlayerId == myId ? match.Right : match.Left;
+                Console.WriteLine("正在生成MatchStartingInfo，玩家ID：" + myId);
+                if (match.MatchStartingInfo != null)
+                {
+                    return match.MatchStartingInfo;
+                }
+
+                var leftUser = await GlobalState.users.GetByIdAsync(match.Left.PlayerId);
+                var rightUser = await GlobalState.users.GetByIdAsync(match.Right.PlayerId);
+                Console.WriteLine("双方为" + leftUser.Id + "," + rightUser.Id);
+                // 获取卡组信息
+                var leftDeck = leftUser.Decks[match.Left.DeckId];
+                var rightDeck = rightUser.Decks[match.Right.DeckId];
+
+                // 生成卡牌列表（简化版本，实际应该解析deck_code）
+                var (leftCards, leftLocation) = GetCardsFromDeck(leftDeck, 1, true);
+                var (rightCards, rightLocation) = GetCardsFromDeck(rightDeck, 41, false);
+
+                // 分离手牌和牌组
+                match.LeftDeck = leftCards.Skip(4).ToList();
+                match.RightDeck = rightCards.Skip(5).ToList();
+
+                match.LeftHand = leftCards.Take(4).Select((card, index) =>
+                {
+                    card = card with { Location = "hand_left" };
+        //            card = card with { LocationNumber = index };
+                    return card;
+                }).ToList();
+
+                match.RightHand = rightCards.Take(5).Select((card, index) =>
+                {
+                    card = card with { Location = "hand_right" };
+//                    card = card with { LocationNumber = index };
+                    return card;
+                }).ToList();
+
+                // 构建MatchStartingInfo
+                match.MatchStartingInfo = new MatchStartingInfo(
+                    LocalSubactions: true,
+                    MatchAndStartingData: new MatchAndStartingData(
+                        Match: new MatchData(
+                            ActionPlayerId: other?.PlayerId.ToString(),
+                            ActionSide: other?.PlayerId == match.Left?.PlayerId ? "left" : "right",
+                            Actions: new List<MatchAction>(),
+                            ActionsUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}/actions",
+                            CurrentActionId: 0,
+                            CurrentTurn: 1,
+                            DeckIdLeft: match.Left.DeckId,
+                            DeckIdRight: match.Right.DeckId,
+                            LeftIsOnline: 1,
+                            MatchId: match.MatchId,
+                            MatchType: "battle",
+                            MatchUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}",
+                            ModifyDate: DateTime.UtcNow.ToString("o"),
+                            Notifications: new List<object>(),
+                            PlayerIdLeft: leftUser.Id,
+                            PlayerIdRight: rightUser.Id,
+                            PlayerStatusLeft: "not_done",
+                            PlayerStatusRight: "not_done",
+                            RightIsOnline: 1,
+                            StartSide: "left",
+                            Status: "running",
+                            WinnerId: 0,
+                            WinnerSide: ""
+                        ),
+                        StartingData: new StartingData(
+                            AllyFactionLeft: leftDeck.AllyFaction.ToLower(),
+                            AllyFactionRight: rightDeck.AllyFaction.ToLower(),
+                            CardBackLeft: leftDeck.CardBack,
+                            CardBackRight: rightDeck.CardBack,
+                            StartingHandLeft: match.LeftHand,
+                            StartingHandRight: match.RightHand,
+                            DeckLeft: match.LeftDeck,
+                            DeckRight: match.RightDeck,
+                            EquipmentLeft: leftUser.EquippedItem?.Select(i => i.ItemId).ToList() ?? new List<string>(),
+                            EquipmentRight: rightUser.EquippedItem?.Select(i => i.ItemId).ToList() ?? new List<string>(),
+                            IsAiMatch: false,
+                            LeftPlayerName: leftUser.Name,
+                            LeftPlayerOfficer: false,
+                            LeftPlayerTag: leftUser.Tag.ToString(),
+                            LocationCardLeft: leftLocation,
+                            LocationCardRight: rightLocation,
+                            PlayerIdLeft: leftUser.Id,
+                            PlayerIdRight: rightUser.Id,
+                            PlayerStarsLeft: 120,
+                            PlayerStarsRight: 120,
+                            RightPlayerName: rightUser.Name,
+                            RightPlayerOfficer: false,
+                            RightPlayerTag: rightUser.Tag.ToString()
+                        )
+                    )
+                );
+
                 return match.MatchStartingInfo;
             }
-
-            var leftUser = await GlobalState.users.GetByIdAsync(match.Left.PlayerId);
-            var rightUser = await GlobalState.users.GetByIdAsync(match.Right.PlayerId);
-
-            // 获取卡组信息
-            var leftDeck = leftUser.Decks[match.Left.DeckId];
-            var rightDeck = rightUser.Decks[match.Right.DeckId];
-
-            // 生成卡牌列表（简化版本，实际应该解析deck_code）
-            var (leftCards, leftLocation) = GetCardsFromDeck(leftDeck, 1, true);
-            var (rightCards, rightLocation) = GetCardsFromDeck(rightDeck, 41, false);
-
-            // 分离手牌和牌组
-            match.LeftDeck = leftCards.Skip(4).ToList();
-            match.RightDeck = rightCards.Skip(5).ToList();
-
-            match.LeftHand = leftCards.Take(4).Select((card, index) =>
+            // 新增辅助方法：从卡组生成卡牌（简化版本）
+            (List<MatchCard> cards, MatchCard location) GetCardsFromDeck(Deck deck, int startId, bool isLeft)
             {
-                card = card with { Location = "hand_left"};
-                card = card with { LocationNumber = index };
-                return card;
-            }).ToList();
+                var cards = new List<MatchCard>();
 
-            match.RightHand = rightCards.Take(5).Select((card, index) =>
-            {
-                card = card with { Location = "hand_right" };
-                card = card with { LocationNumber = index };
-                return card;
-            }).ToList();
-
-            // 构建MatchStartingInfo
-            match.MatchStartingInfo = new MatchStartingInfo(
-                LocalSubactions: true,
-                MatchAndStartingData: new MatchAndStartingData(
-                    Match: new MatchData(
-                        ActionPlayerId: other?.PlayerId.ToString(),
-                        ActionSide: other?.PlayerId == match.Left?.PlayerId ? "left" : "right",
-                        Actions: new List<MatchAction>(),
-                        ActionsUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}/actions",
-                        CurrentActionId: 0,
-                        CurrentTurn: 1,
-                        DeckIdLeft: match.Left.DeckId,
-                        DeckIdRight: match.Right.DeckId,
-                        LeftIsOnline: 1,
-                        MatchId: match.MatchId,
-                        MatchType: "battle",
-                        MatchUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}",
-                        ModifyDate: DateTime.UtcNow.ToString("o"),
-                        Notifications: new List<object>(),
-                        PlayerIdLeft: leftUser.Id,
-                        PlayerIdRight: rightUser.Id,
-                        PlayerStatusLeft: "not_done",
-                        PlayerStatusRight: "not_done",
-                        RightIsOnline: 1,
-                        StartSide: "left",
-                        Status: "pending",
-                        WinnerId: 0,
-                        WinnerSide: ""
-                    ),
-                    StartingData: new StartingData(
-                        AllyFactionLeft: leftDeck.AllyFaction.ToLower(),
-                        AllyFactionRight: rightDeck.AllyFaction.ToLower(),
-                        CardBackLeft: leftDeck.CardBack,
-                        CardBackRight: rightDeck.CardBack,
-                        StartingHandLeft: match.LeftHand,
-                        StartingHandRight: match.RightHand,
-                        DeckLeft: match.LeftDeck,
-                        DeckRight: match.RightDeck,
-                        EquipmentLeft: leftUser.EquippedItem?.Select(i => i.ItemId).ToList() ?? new List<string>(),
-                        EquipmentRight: rightUser.EquippedItem?.Select(i => i.ItemId).ToList() ?? new List<string>(),
-                        IsAiMatch: false,
-                        LeftPlayerName: leftUser.Name,
-                        LeftPlayerOfficer: false,
-                        LeftPlayerTag: leftUser.Tag.ToString(),
-                        LocationCardLeft: leftLocation,
-                        LocationCardRight: rightLocation,
-                        PlayerIdLeft: leftUser.Id,
-                        PlayerIdRight: rightUser.Id,
-                        PlayerStarsLeft: 120,
-                        PlayerStarsRight: 120,
-                        RightPlayerName: rightUser.Name,
-                        RightPlayerOfficer: false,
-                        RightPlayerTag: rightUser.Tag.ToString()
-                    )
-                )
-            );
-
-            return match.MatchStartingInfo;
-        }
-
-        // 新增辅助方法：从卡组生成卡牌（简化版本）
-        (List<MatchCard> cards, MatchCard location) GetCardsFromDeck(Deck deck, int startId, bool isLeft)
-        {
-            var cards = new List<MatchCard>();
-
-            // 生成位置卡
-            var locationCard = new MatchCard(
-                CardId: startId,
-                IsGold: true,
-                Location: isLeft ? "board_hqleft" : "board_hqright",
-                LocationNumber: 0,
-                Name: "location_card" // 这里应该根据deck_code解析实际卡牌名
-            );
-
-            // 生成40张卡牌（简化：实际应根据deck_code解析）
-            for (int i = 1; i <= 40; i++)
-            {
-                cards.Add(new MatchCard(
-                    CardId: startId + i,
-                    IsGold: true,
-                    Location: isLeft ? "deck_left" : "deck_right",
-                    LocationNumber: i - 1,
-                    Name: $"card_{i}"
-                ));
+                // 生成位置卡
+                var locationCard = new MatchCard(
+                    CardId: startId,
+                    IsGold: false,
+                    Location: isLeft ? "board_hqleft" : "board_hqright",
+                    LocationNumber: 0,
+                    Name: a.DeckCodeTable[deck.DeckCode[^4..^2]].Card // 这里应该根据deck_code解析实际卡牌名
+                );
+                deck.DeckCode=deck.DeckCode.Remove(0, 5);
+                Console.WriteLine(deck.DeckCode + locationCard.Name);
+                int cCount = 0;
+                while (!deck.DeckCode[0].Equals('~'))
+                {
+                    while ((!deck.DeckCode[0].Equals(';'))&& (!deck.DeckCode[0].Equals('~')))
+                    {
+                        var lkp = a.DeckCodeTable[deck.DeckCode.Substring(0, 2)];
+                        deck.DeckCode = deck.DeckCode[2..];
+                        for (short a = 0; a <= cCount; a++)
+                            cards.Add(new MatchCard(
+                                CardId: ++startId,
+                                IsGold: false,
+                                Location: isLeft ? "deck_left" : "deck_right",
+                                LocationNumber: 0,
+                                Name: lkp.Card
+                            ));
+                    }
+                    deck.DeckCode = deck.DeckCode[1..];
+                    cCount++;
+                }
+                var random = new Random();
+                for (int i = cards.Count - 1; i > 0; i--)
+                {
+                    int j = random.Next(i + 1);
+                    (cards[i], cards[j]) = (cards[j], cards[i]);
+                }
+                //cards.ForEach((c) =>
+                //{
+                //    c = c with { LocationNumber = cards.IndexOf(c) };
+                //    Console.WriteLine(c.ToString());
+                //});
+                for (int l = 0; l < cards.Count; l++)
+                {
+                    cards[l] = cards[l] with { LocationNumber = l };
+                    Console.WriteLine(cards[l].ToString());
+                }
+                return (cards, locationCard);
             }
-
-            // 随机洗牌
-            var random = new Random();
-            for (int i = cards.Count - 1; i > 0; i--)
+            app.MapGet("/matches/v2/reconnect", () =>
             {
-                int j = random.Next(i + 1);
-                (cards[i], cards[j]) = (cards[j], cards[i]);
-            }
-
-            return (cards, locationCard);
-        }
-
-        app.MapGet("/matches/v2/{id}", (int id) =>
+                return Results.Ok("");
+            });
+            app.MapGet("/matches/v2/{id}", (int id) =>
             {
                 return Results.Ok("running");
             });
 
-app.MapPut("/matches/v2/{id}", async(int id, MatchAction matchAction, HttpContext context) =>
-{
-    var user = await GetUserFromAuthAsync(context);
-    if (user == null)
-        return Results.Unauthorized();
-
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.NotFound($"Match with ID {id} not found");
-
-    // 反作弊检查
-    if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
-    {
-        // TODO: WebSocket发送封禁消息
-        user.Banned = true;
-
-        await GlobalState.users.SaveUserAsync(user);
-    match.WinnerSide = user.Id == match.Left?.PlayerId? "right" : "left";
-        return Results.Ok(new { });
-    }
-
-    if (matchAction.Action == "lvl-loaded")
-    return Results.Ok(new { otherPlayerReady = 1 });
-
-if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
-{
-    match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
-}
-
-if (!string.IsNullOrEmpty(matchAction.ActionType) || !string.IsNullOrEmpty(matchAction.Action))
-{
-    if (matchAction.ActionId > 0)
-    {
-        if (user.Id == match.Left?.PlayerId && matchAction.ActionId >= match.LeftMinactionid)
-            match.LeftMinactionid = matchAction.ActionId;
-        else if (matchAction.ActionId >= match.RightMinactionid)
-            match.RightMinactionid = matchAction.ActionId;
-    }
-
-    if (user.Id == match.Left?.PlayerId)
-        match.RightActions.Add(matchAction);
-    else
-        match.LeftActions.Add(matchAction);
-}
-
-return Results.Ok("OK");
-});
-
-app.MapPut("/matches/v2/{id}/actions", async (int id, HttpContext context, dynamic body) =>
-{
-    var user = await GetUserFromAuthAsync(context);
-    if (user == null)
-        return Results.Unauthorized();
-
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.NotFound($"Match with ID {id} not found");
-
-    var result = new Dictionary<string, object>();
-    var actions = match.GetActionsById(user.Id);
-
-    if (actions.Count > 0)
-    {
-        result["actions"] = actions.ToArray();
-        actions.Clear();
-    }
-
-    result["match"] = new
-    {
-        player_status_left = match.PlayerStatusLeft,
-        player_status_right = match.PlayerStatusRight,
-        status = "running"
-    };
-
-    result["opponent_polling"] = true;
-
-    if (!string.IsNullOrEmpty(match.WinnerSide))
-    {
-        result["match"] = new
-        {
-            player_status_left = GameConstants.MulliganDone,
-            player_status_right = GameConstants.MulliganDone,
-            status = GameConstants.Finished
-        };
-
-        var opponentId = user.Id == match.Left?.PlayerId ? match.Right?.PlayerId : match.Left?.PlayerId;
-        var cheatAction = new MatchAction(
-            ActionType: GameConstants.XActionCheat,
-            PlayerId: opponentId?.ToString(),
-            ActionData: new Dictionary<string, object>
+            app.MapPut("/matches/v2/{id}", async (int id, MatchAction matchAction, HttpContext context) =>
             {
-                ["0"] = "DamageCard",
-                ["1"] = match.WinnerSide == "left" ? "41" : "1",
-                ["2"] = "99",
-                ["playerID"] = opponentId?.ToString()
-            },
-            ActionId: user.Id == match.Left?.PlayerId ? match.RightMinactionid + 1 : match.LeftMinactionid + 1,
-            LocalSubactions: 1
-        );
+                var user = await GetUserFromAuthAsync(context);
+                if (user == null)
+                    return Results.Unauthorized();
 
-        if (result["actions"] is object[] existingActions)
-        {
-            result["actions"] = new object[] { cheatAction }.Concat(existingActions).ToArray();
-        }
-        else
-        {
-            result["actions"] = new object[] { cheatAction };
-        }
-    }
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.NotFound($"Match with ID {id} not found");
 
-    return Results.Ok(result);
-});
-app.MapGet("/config", (HttpContext context) =>
-{
-    return Results.Ok(new CloseConfig(XserverClosed: "路几把"));
-});// 3. 玩家管理
-app.MapPost("/matches/v2/{id}/actions", async (int id, MatchAction matchAction, HttpContext context) =>
-{
-    var user = await GetUserFromAuthAsync(context);
-    if (user == null)
-        return Results.Unauthorized();
+                // 反作弊检查
+                if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
+                {
+                    // TODO: WebSocket发送封禁消息
+                    user.Banned = true;
 
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.NotFound($"Match with ID {id} not found");
+                    await GlobalState.users.SaveUserAsync(user);
+                    match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
+                    return Results.Ok(new { });
+                }
 
-    // 反作弊检查
-    if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
-    {
-        // TODO: WebSocket发送封禁消息
-        user.Banned = true;
+                if (matchAction.Action == "lvl-loaded") 
+                    return Results.Ok(new { otherPlayerReady = 1 });
 
-        await GlobalState.users.SaveUserAsync(user);
-        match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
-        return Results.Ok(new { });
-    }
+                if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
+                {
+                    match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
+                }
 
-    if (matchAction.Action == "lvl-loaded")
-        return Results.Ok(new { otherPlayerReady = 1 });
+                if (!string.IsNullOrEmpty(matchAction.ActionType) || !string.IsNullOrEmpty(matchAction.Action))
+                {
+                    if (matchAction.ActionId > 0)
+                    {
+                        if (user.Id == match.Left?.PlayerId && matchAction.ActionId >= match.LeftMinactionid)
+                            match.LeftMinactionid = matchAction.ActionId;
+                        else if (matchAction.ActionId >= match.RightMinactionid)
+                            match.RightMinactionid = matchAction.ActionId;
+                    }
 
-    if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
-    {
-        match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
-    }
+                    if (user.Id == match.Left?.PlayerId)
+                        match.RightActions.Add(matchAction);
+                    else
+                        match.LeftActions.Add(matchAction);
+                }
 
-    if (!string.IsNullOrEmpty(matchAction.ActionType) || !string.IsNullOrEmpty(matchAction.Action))
-    {
-        if (matchAction.ActionId > 0)
-        {
-            if (user.Id == match.Left?.PlayerId && matchAction.ActionId >= match.LeftMinactionid)
-                match.LeftMinactionid = matchAction.ActionId;
-            else if (matchAction.ActionId >= match.RightMinactionid)
-                match.RightMinactionid = matchAction.ActionId;
-        }
+                return Results.Ok("OK");
+            });
 
-        if (user.Id == match.Left?.PlayerId)
-            match.RightActions.Add(matchAction);
-        else
-            match.LeftActions.Add(matchAction);
-    }
-
-    return Results.Ok("OK");
-});
-
-// 7. 调度阶段
-app.MapPost("/matches/v2/{id}/mulligan", async (int id, MulliganCards mulliganCards, HttpContext context) =>
-{
-    var user = await GetUserFromAuthAsync(context);
-    if (user == null)
-        return Results.Unauthorized();
-
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.NotFound($"Match with ID {id} not found");
-
-    List<MatchCard> deck, hand;
-    if (user.Id == match.Left?.PlayerId)
-    {
-        deck = match.LeftDeck;
-        hand = match.LeftHand;
-        match.PlayerStatusLeft = GameConstants.MulliganDone;
-    }
-    else
-    {
-        deck = match.RightDeck;
-        hand = match.RightHand;
-        match.PlayerStatusRight = GameConstants.MulliganDone;
-    }
-
-    var result = new MulliganResult(
-        Deck: deck,
-        ReplacementCards: new List<MatchCard>()
-    );
-
-    foreach (var cardId in mulliganCards.DiscardedCardIds)
-    {
-        foreach (var card in hand)
-        {
-            if (card.CardId == cardId)
+            app.MapPut("/matches/v2/{id}/actions", async (int id, HttpContext context, dynamic body) =>
             {
-                var randomIndex = Random.Shared.Next(result.Deck.Count);
+                var user = await GetUserFromAuthAsync(context);
+                if (user == null)
+                    return Results.Unauthorized();
 
-                //// 交换位置
-                //(result.Deck[randomIndex].Location, card.Location) =
-                //    (card.Location, result.Deck[randomIndex].Location);
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.NotFound($"Match with ID {id} not found");
 
-                //(result.Deck[randomIndex].LocationNumber, card.LocationNumber) =
-                //    (card.LocationNumber, result.Deck[randomIndex].LocationNumber);
+                var result = new Dictionary<string, object>();
+                var actions = match.GetActionsById(user.Id);
 
-                result.ReplacementCards.Add(result.Deck[randomIndex]);
-                result.Deck[randomIndex] = card;
-                break;
-            }
-        }
-    }
+                if (actions.Count > 0)
+                {
+                    result["actions"] = actions.ToArray();
+                    actions.Clear();
+                }
 
-    if (user.Id == match.Left?.PlayerId)
-        match.MulliganLeft = result;
-    else
-        match.MulliganRight = result;
+                result["match"] = new
+                {
+                   player_status_left = match.PlayerStatusLeft,
+                    //player_status_right = match.PlayerStatusRight,
+                  //  player_status_left             = "mulligan_done",
 
-    return Results.Ok(result);
-});
+                   //单人对战
+                player_status_right = "mulligan_done",
+                    status = "running"
+                };
 
-app.MapGet("/matches/v2/{id}/mulligan/{location}", (int id, string location) =>
-{
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.Ok("null");
+                result["opponent_polling"] = true;
 
-    var mulligan = location == "left" ? match.MulliganLeft : match.MulliganRight;
-    return mulligan == null ? Results.Ok("null") : Results.Ok(mulligan);
-});
+                if (!string.IsNullOrEmpty(match.WinnerSide))
+                {
+                    result["match"] = new
+                    {
+                        player_status_left = GameConstants.MulliganDone,
+                        player_status_right = GameConstants.MulliganDone,
+                        status = GameConstants.Finished
+                    };
 
-// 8. 比赛结束
-app.MapGet("/matches/v2/{id}/post", async (int id, HttpContext context) =>
-{
-    var user = await GetUserFromAuthAsync(context);
-    if (user == null)
-        return Results.Unauthorized();
+                    var opponentId = user.Id == match.Left?.PlayerId ? match.Right?.PlayerId : match.Left?.PlayerId;
+                    var cheatAction = new MatchAction(
+                        ActionType: GameConstants.XActionCheat,
+                        PlayerId: opponentId?.ToString(),
+                        ActionData: new Dictionary<string, object>
+                        {
+                            ["0"] = "DamageCard",
+                            ["1"] = match.WinnerSide == "left" ? "41" : "1",
+                            ["2"] = "99",
+                            ["playerID"] = opponentId?.ToString()
+                        },
+                        ActionId: user.Id == match.Left?.PlayerId ? match.RightMinactionid + 1 : match.LeftMinactionid + 1,
+                        LocalSubactions: 1
+                    );
 
-    if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-        return Results.NotFound($"Match with ID {id} not found");
+                    if (result["actions"] is object[] existingActions)
+                    {
+                        result["actions"] = new object[] { cheatAction }.Concat(existingActions).ToArray();
+                    }
+                    else
+                    {
+                        result["actions"] = new object[] { cheatAction };
+                    }
+                }
 
-    if (user.Id == match.Left?.PlayerId)
-        match.PlayerStatusLeft = GameConstants.EndMatch;
-    else
-        match.PlayerStatusRight = GameConstants.EndMatch;
+                return Results.Ok(result);
+            });
+            app.MapGet("/config", (HttpContext context) =>
+            {
+                return Results.Ok(new CloseConfig(XserverClosed: "路几把"));
+            });// 3. 玩家管理
+            app.MapPost("/matches/v2/{id}/actions", async (int id, MatchAction matchAction, HttpContext context) =>
+            {
+                var user = await GetUserFromAuthAsync(context);
+                if (user == null)
+                    return Results.Unauthorized();
 
-    if (match.PlayerStatusLeft == GameConstants.EndMatch && match.PlayerStatusRight == GameConstants.EndMatch)
-    {
-        config.appconfig.MatchedPairs.TryRemove(id, out _);
-    }
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.NotFound($"Match with ID {id} not found");
 
-    var player = match.GetPlayerById(user.Id);
-    var isWinner = match.WinnerSide == (user.Id == match.Left?.PlayerId ? "left" : "right");
+                // 反作弊检查
+                if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
+                {
+                    // TODO: WebSocket发送封禁消息
+                    user.Banned = true;
 
-    if (player != null && user.Decks.TryGetValue(player.DeckId, out var deck))
-    {
-        var response = new PostMatchResponse(
-            Faction: deck.MainFaction,
-            Winner: isWinner
-        );
+                    await GlobalState.users.SaveUserAsync(user);
+                    match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
+                    return Results.Ok(new { });
+                }
 
-        return Results.Ok(response);
-    }
+                if (matchAction.Action == "lvl-loaded")
+                    return Results.Ok(new { otherPlayerReady = 1 });
 
-    return Results.NotFound();
-});
+                if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
+                {
+                    match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
+                }
 
-// 10. 管理API端点
-app.MapGet("/admin/GlobalState.users/count", async () =>
-{
-    var users = await GlobalState.users.GetAllUsersAsync();
-    return Results.Ok(new { count = users.Count });
-});
+                if (!string.IsNullOrEmpty(matchAction.ActionType) || !string.IsNullOrEmpty(matchAction.Action))
+                {
+                    if (matchAction.ActionId > 0)
+                    {
+                        if (user.Id == match.Left?.PlayerId && matchAction.ActionId >= match.LeftMinactionid)
+                            match.LeftMinactionid = matchAction.ActionId;
+                        else if (matchAction.ActionId >= match.RightMinactionid)
+                            match.RightMinactionid = matchAction.ActionId;
+                    }
 
-app.MapGet("/admin/users/list", async () =>
-{
-    var Users = await GlobalState.users.GetAllUsersAsync();
-    var simplifiedUsers = Users.Select(u => new
-    {
-        u.Id,
-        u.UserName,
-        u.Name,
-        u.Tag,
-        DeckCount = u.Decks.Count,
-        u.Banned,
-        CreatedAt = u.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
-    }).ToList();
+                    if (user.Id == match.Left?.PlayerId)
+                        match.RightActions.Add(matchAction);
+                    else
+                        match.LeftActions.Add(matchAction);
+                }
 
-    return Results.Ok(simplifiedUsers);
-});
+                return Results.Ok("OK");
+            });
 
-app.MapDelete("/admin/GlobalState.users/{userId}", async (int userId) =>
-{
-    var user = await GlobalState.users.GetByIdAsync(userId);
-    if (user == null)
-        return Results.NotFound($"User with ID {userId} not found");
+            // 7. 调度阶段
+            app.MapPost("/matches/v2/{id}/mulligan", async (int id, MulliganCards mulliganCards, HttpContext context) =>
+            {
+                var user = await GetUserFromAuthAsync(context);
+                if (user == null)
+                    return Results.Unauthorized();
 
-    await GlobalState.users.DeleteUserAsync(userId);
-    return Results.Ok(new { message = $"User {userId} deleted successfully" });
-});
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.NotFound($"Match with ID {id} not found");
 
-app.MapPost("/admin/GlobalState.users/{userId}/ban", async (int userId) =>
-{
-    var user = await GlobalState.users.GetByIdAsync(userId);
-    if (user == null)
-        return Results.NotFound($"User with ID {userId} not found");
+                List<MatchCard> deck, hand;
+                if (user.Id == match.Left?.PlayerId)
+                {
+                    deck = match.LeftDeck;
+                    hand = match.LeftHand;
+                    match.PlayerStatusLeft = GameConstants.MulliganDone;
+                }
+                else
+                {
+                    deck = match.RightDeck;
+                    hand = match.RightHand;
+                    match.PlayerStatusRight = GameConstants.MulliganDone;
+                }
 
-    user.Banned = true;
+                var result = new MulliganResult(
+                    Deck: deck,
+                    ReplacementCards: new List<MatchCard>()
+                );
 
-    await GlobalState.users.SaveUserAsync(user);
-    return Results.Ok(new { message = $"User {userId} banned successfully" });
-});
+                foreach (var cardId in mulliganCards.DiscardedCardIds)
+                {
+                    foreach (var card in hand)
+                    {
+                        if (card.CardId == cardId)
+                        {
+                            var randomIndex = Random.Shared.Next(result.Deck.Count);
 
-app.MapPost("/admin/GlobalState.users/{userId}/unban", async (int userId) =>
-{
-    var user = await GlobalState.users.GetByIdAsync(userId);
-    if (user == null)
-        return Results.NotFound($"User with ID {userId} not found");
+                            //// 交换位置
+                            //(result.Deck[randomIndex].Location, card.Location) =
+                            //    (card.Location, result.Deck[randomIndex].Location);
 
-    user.Banned = false;
+                            //(result.Deck[randomIndex].LocationNumber, card.LocationNumber) =
+                            //    (card.LocationNumber, result.Deck[randomIndex].LocationNumber);
 
-    await GlobalState.users.SaveUserAsync(user);
-    return Results.Ok(new { message = $"User {userId} unbanned successfully" });
-});
+                            result.ReplacementCards.Add(result.Deck[randomIndex]);
+                            result.Deck[randomIndex] = card;
+                            break;
+                        }
+                    }
+                }
 
-// 11. 全局异常处理
-app.UseExceptionHandler(exceptionHandlerApp =>
-{
-    exceptionHandlerApp.Run(async context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new ErrorResponse(
-            Error: "Internal server error",
-            Message: "An unexpected error occurred",
-            StatusCode: 500
-        ));
-    });
-});
+                if (user.Id == match.Left?.PlayerId)
+                    match.MulliganLeft = result;
+                else
+                    match.MulliganRight = result;
 
-// 12. 未找到路由的处理
-app.UseStatusCodePages(async statusCodeContext =>
-{
-    var response = statusCodeContext.HttpContext.Response;
+                return Results.Ok(result);
+            });
 
-    if (response.StatusCode == 404)
-    {
-        await response.WriteAsJsonAsync(new ErrorResponse(
-            Error: "Not found",
-            Message: "The requested resource was not found",
-            StatusCode: 404
-        ));
-    }
-});
+            app.MapGet("/matches/v2/{id}/mulligan/{location}", (int id, string location) =>
+            {
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.Ok("null");
 
-// 数据库初始化和清理
-app.Lifetime.ApplicationStarted.Register(() =>
-{
-    Console.WriteLine($"Application started on {config.appconfig.getAddressHttp()}");
-    Console.WriteLine($"Faster 已准备");
-});
+                var mulligan = location == "left" ? match.MulliganLeft : match.MulliganRight;
+                return mulligan == null ? Results.Ok("null") : Results.Ok(mulligan);
+            });
 
-app.Lifetime.ApplicationStopping.Register(() =>
-{
-    Console.WriteLine("Application stopping. Cleaning up...");
-    // 清理数据库资源
-    GlobalState.users.Dispose();
-});
+            // 8. 比赛结束
+            app.MapGet("/matches/v2/{id}/post", async (int id, HttpContext context) =>
+            {
+                var user = await GetUserFromAuthAsync(context);
+                if (user == null)
+                    return Results.Unauthorized();
 
-//Console.WriteLine(app.Map);
-Console.ForegroundColor = ConsoleColor.Blue;
-Console.WriteLine("正在启动http服务器");
-Console.WriteLine("等待两秒确保初始化成功");
-if (File.Exists("./YCDR"))
-    Console.WriteLine("发现持久化数据，已加载");
-Console.ForegroundColor = ConsoleColor.White;
-await app.RunAsync();
+                if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
+                    return Results.NotFound($"Match with ID {id} not found");
+
+                if (user.Id == match.Left?.PlayerId)
+                    match.PlayerStatusLeft = GameConstants.EndMatch;
+                else
+                    match.PlayerStatusRight = GameConstants.EndMatch;
+
+                if (match.PlayerStatusLeft == GameConstants.EndMatch && match.PlayerStatusRight == GameConstants.EndMatch)
+                {
+                    config.appconfig.MatchedPairs.TryRemove(id, out _);
+                }
+
+                var player = match.GetPlayerById(user.Id);
+                var isWinner = match.WinnerSide == (user.Id == match.Left?.PlayerId ? "left" : "right");
+
+                if (player != null && user.Decks.TryGetValue(player.DeckId, out var deck))
+                {
+                    var response = new PostMatchResponse(
+                        Faction: deck.MainFaction,
+                        Winner: isWinner
+                    );
+
+                    return Results.Ok(response);
+                }
+
+                return Results.NotFound();
+            });
+
+            // 10. 管理API端点
+            app.MapGet("/admin/GlobalState.users/count", async () =>
+            {
+                var users = await GlobalState.users.GetAllUsersAsync();
+                return Results.Ok(new { count = users.Count });
+            });
+
+            app.MapGet("/admin/users/list", async () =>
+            {
+                var Users = await GlobalState.users.GetAllUsersAsync();
+                var simplifiedUsers = Users.Select(u => new
+                {
+                    u.Id,
+                    u.UserName,
+                    u.Name,
+                    u.Tag,
+                    DeckCount = u.Decks.Count,
+                    u.Banned,
+                    CreatedAt = u.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                }).ToList();
+
+                return Results.Ok(simplifiedUsers);
+            });
+
+            app.MapDelete("/admin/GlobalState.users/{userId}", async (int userId) =>
+            {
+                var user = await GlobalState.users.GetByIdAsync(userId);
+                if (user == null)
+                    return Results.NotFound($"User with ID {userId} not found");
+
+                await GlobalState.users.DeleteUserAsync(userId);
+                return Results.Ok(new { message = $"User {userId} deleted successfully" });
+            });
+
+            app.MapPost("/admin/GlobalState.users/{userId}/ban", async (int userId) =>
+            {
+                var user = await GlobalState.users.GetByIdAsync(userId);
+                if (user == null)
+                    return Results.NotFound($"User with ID {userId} not found");
+
+                user.Banned = true;
+
+                await GlobalState.users.SaveUserAsync(user);
+                return Results.Ok(new { message = $"User {userId} banned successfully" });
+            });
+
+            app.MapPost("/admin/GlobalState.users/{userId}/unban", async (int userId) =>
+            {
+                var user = await GlobalState.users.GetByIdAsync(userId);
+                if (user == null)
+                    return Results.NotFound($"User with ID {userId} not found");
+
+                user.Banned = false;
+
+                await GlobalState.users.SaveUserAsync(user);
+                return Results.Ok(new { message = $"User {userId} unbanned successfully" });
+            });
+
+            // 11. 全局异常处理
+            app.UseExceptionHandler(exceptionHandlerApp =>
+            {
+                exceptionHandlerApp.Run(async context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsJsonAsync(new ErrorResponse(
+                        Error: "Internal server error",
+                        Message: "An unexpected error occurred",
+                        StatusCode: 500
+                    ));
+                });
+            });
+
+            // 12. 未找到路由的处理
+            app.UseStatusCodePages(async statusCodeContext =>
+            {
+                var response = statusCodeContext.HttpContext.Response;
+
+                if (response.StatusCode == 404)
+                {
+                    await response.WriteAsJsonAsync(new ErrorResponse(
+                        Error: "Not found",
+                        Message: "The requested resource was not found",
+                        StatusCode: 404
+                    ));
+                }
+            });
+
+            // 数据库初始化和清理
+            app.Lifetime.ApplicationStarted.Register(() =>
+            {
+                Console.WriteLine($"Application started on {config.appconfig.getAddressHttp()}");
+                Console.WriteLine($"Faster 已准备");
+            });
+
+            app.Lifetime.ApplicationStopping.Register(() =>
+            {
+                Console.WriteLine("Application stopping. Cleaning up...");
+                // 清理数据库资源
+                GlobalState.users.Dispose();
+            });
+
+            //Console.WriteLine(app.Map);
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine("正在启动http服务器");
+            Console.WriteLine("等待两秒确保初始化成功");
+            if (File.Exists("./YCDR"))
+                Console.WriteLine("发现持久化数据，已加载");
+            Console.ForegroundColor = ConsoleColor.White;
+            await app.RunAsync();
 
         }
     }
