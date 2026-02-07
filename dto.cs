@@ -24,19 +24,26 @@ namespace fyserver
 
         public static readonly List<Item> Items = new()
     {
-        new Item("", "cardback_yokoshiba", "")
     };
 
         public static Dictionary<string, CardLookup> DeckCodeTable = new();
-        public static void InitLibrary(string Path, string path2)
+        public static void InitLibrary(string Path, string path2,string p3)
         {
-            string a = File.ReadAllText(Path);
-            List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(a);
+            List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(File.ReadAllText(Path));
+            List<string> emojis = JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(path2));
+            List<string> cbs = JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(p3));
             foreach (var c in cs)
             {
                 Library.Cards.Add(new LibraryItem(c.card, 40, 0, c.ID, 0));
                 DeckCodeTable.Add(c.deck_code_id, new CardLookup(c.card, c.deck_code_id, c.ID));
                 //现在我打算把桌饰写出来
+            }
+            foreach (var e in emojis) {
+                Items.Add(new("{}",e,0));
+            }
+            foreach (var c in cbs)
+            {
+                Items.Add(new("{}", c, 0));
             }
         }
     }
@@ -288,7 +295,8 @@ namespace fyserver
     );
 
     public record ItemsResponse(
-        List<Item> EquippedItems,
+        string Date,
+        List<EquippedItem> EquippedItems,
         List<Item> Items
     );
     // WebSocket messages as records
@@ -557,8 +565,7 @@ namespace fyserver
         {
             // 初始化集合，防止空引用
             Decks = new Dictionary<int, Deck>();
-            EquippedItem = new List<Item>();
-            Items = new List<Item>();
+            EquippedItem = new List<EquippedItem>();
         }
 
         public User(string userName) : this()
@@ -581,8 +588,7 @@ namespace fyserver
         // 会自动将 int key 转为 string key ("1": {...})
         public Dictionary<int, Deck> Decks { get; set; }
 
-        public List<Item> EquippedItem { get; set; }
-        public List<Item> Items { get; set; }
+        public List<EquippedItem> EquippedItem { get; set; }
         public bool Banned { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -646,13 +652,9 @@ namespace fyserver
             set => ModifyDate = DateTime.Parse(value);
         }
     }
-    public class Item
+    public class EquippedItem
     {
-        public Item()
-        {
-        }
-
-        public Item(string faction, string itemId, string slot)
+        public EquippedItem(string faction, string itemId, string slot)
         {
             Faction = faction;
             ItemId = itemId;
@@ -663,7 +665,11 @@ namespace fyserver
         public string ItemId { get; set; } = "";
         public string Slot { get; set; } = "";
     }
-
+    public record Item(
+      string details,
+      string item_id,
+              int cnt = 0
+        );
     public class MatchInfo
     {
         public MatchInfo()

@@ -8,9 +8,9 @@ namespace fyserver
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         async public Task StartHttpServer()
         {
-            a.InitLibrary("./deckCodeIDsTable2.json", "");
+            a.InitLibrary("./library/deckCodeIDsTable2.json", "./library/emojiLib.json", "./library/cardbackLib.json");
             Console.ForegroundColor = ConsoleColor.Green;
-
+            Console.WriteLine("XXXXXXXXXX");
             Console.ForegroundColor = ConsoleColor.White;
             builder.Services.AddOpenApi();
             builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
@@ -425,47 +425,37 @@ namespace fyserver
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(player_id));
                 if (user == null)
                     return Results.NotFound($"User with ID {player_id} not found");
-
-
-
                 user.Decks.Remove(deck_id);
                 await GlobalState.users.SaveUserAsync(user);
 
                 return Results.Ok(new { });
             });
-
+            app.MapGet("/items/decks/{id}", async (string id) =>
+            {
+                return Results.Ok("");
+            });
             // 5. 物品装备
             app.MapGet("/items/{id}", async (string id) =>
             {
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
-
-
-
-                if (user.Items == null || user.Items.Count == 0)
-                {
-                    user.Items = a.Items.ToList();
-                    await GlobalState.users.SaveUserAsync(user);
-                }
-
                 var response = new ItemsResponse(
-
-                    EquippedItems: user.EquippedItem,
-                    Items: user.Items
+                    Date: DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+        EquippedItems: user.EquippedItem,
+                    Items: a.Items.ToList()
                 );
 
                 return Results.Ok(response);
             });
 
-            app.MapPost("/items/{id}", async (string id, Item item) =>
+            app.MapPost("/items/{id}", async (string id, EquippedItem item) =>
             {
                 var user = await GlobalState.users.GetByIdAsync(int.Parse(id));
                 if (user == null)
                     return Results.NotFound($"User with ID {id} not found");
                 if (user.EquippedItem == null)
-                    user.EquippedItem = new List<Item>();
-
+                    user.EquippedItem = new List<EquippedItem>();
                 // 移除相同槽位的装备
                 user.EquippedItem.RemoveAll(i => i.Slot == item.Slot);
                 // 添加新装备

@@ -13,4 +13,7 @@
   "appscale_tablet_min": 1.0,
   "battle_wait_time": 60,
   "finland": 0,
+  "achievements": 0,
+  "avatars": 0,
+  "broken_deck_check": 0,
   "websocketurl": "ws://192.168.1.24:5232","homefront_date":"2025.11.27-09.00.00"}
