@@ -864,7 +864,7 @@ namespace fyserver
 
                 if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                     return Results.NotFound($"Match with ID {id} not found");
-
+                //对局已加密，这里不在使用
                 // 反作弊检查
                 if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                 {
