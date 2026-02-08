@@ -8,7 +8,7 @@ using System.Text.Json;
 
 
 config.appconfig.read();
-new http().StartHttpServer();
+ new http().StartHttpServer();
 await Task.Delay(2000);
 new ws().StartWsServerAsync();
 var options = new JsonSerializerOptions
@@ -16,7 +16,7 @@ var options = new JsonSerializerOptions
     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
 };
 ClientWebSocket webSocket = new ClientWebSocket();
-await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs()), CancellationToken.None);
+await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWsR()), CancellationToken.None);
 string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Message: "ss", Channel: "ping"), options);
 ws.SendString(webSocket, message);
 var buffer = new byte[1024];
@@ -34,6 +34,7 @@ if (result.EndOfMessage)
     bs = new List<byte>();
 }
 await webSocket.CloseAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
+Console.ReadLine();
 
 //var d = "%%24|060d0n1d1g1G1H1r1t1v7N7Y8U9g9n9qdDdEdze4efgsgtgvhThWjBjqowrht5tUtWw1w3wrwx;1b;;~;;;|0N1b";
 //d = d.Remove(0, 5);

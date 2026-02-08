@@ -16,4 +16,5 @@
   "achievements": 0,
   "avatars": 0,
   "broken_deck_check": 0,
-  "websocketurl": "ws://192.168.1.24:5232","homefront_date":"2025.11.27-09.00.00"}
+  "key_encryption": 0,
+  "websocketurl": {WsAddress},"homefront_date":"2025.11.27-09.00.00"}

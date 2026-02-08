@@ -8,20 +8,19 @@ namespace fyserver
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
         async public Task StartHttpServer()
         {
-            a.InitLibrary("./library/deckCodeIDsTable2.json", "./library/emojiLib.json", "./library/cardbackLib.json");
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("XXXXXXXXXX");
-            Console.ForegroundColor = ConsoleColor.White;
-            builder.Services.AddOpenApi();
-            builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-            {
-                options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-            });
-            builder.Services.AddRouting();
-            var app = builder.Build();
-
+                a.InitLibrary("./library/deckCodeIDsTable2.json", "./library/emojiLib.json", "./library/cardbackLib.json");
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("XXXXXXXXXX");
+                Console.ForegroundColor = ConsoleColor.White;
+                builder.Services.AddOpenApi();
+                builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
+                builder.Services.AddEndpointsApiExplorer();
+                builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+                {
+                    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+                });
+                builder.Services.AddRouting();
+                var app = builder.Build();
             // 路径规范化中间件 - 处理双斜杠问题
             app.Use(async (context, next) =>
             {
@@ -204,7 +203,7 @@ namespace fyserver
                     Rewards: new List<object>(),
                     SeasonEnd: "2025-08-01T00:00:00Z",
                     SeasonWins: 9999,
-                    ServerOptions: File.Exists("./config/serverOptions.json") ? File.ReadAllText("./config/serverOptions.json") : "",//'{"nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}}, "appscale_desktop_default": 1.0, "appscale_desktop_max": 1.4, "appscale_mobile_default": 1.4, "appscale_mobile_max": 1.4, "appscale_mobile_min": 1.0, "appscale_tablet_min": 1.0, "battle_wait_time": 60, "nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}},"websocketurl": "ws://127.0.0.1:5232","homefront_date":"2025.11.27-09.00.00"}',
+                    ServerOptions: File.Exists("./config/serverOptions.json") ? File.ReadAllText("./config/serverOptions.json").Replace("{WsAddress}",config.appconfig.getAddressWsR()) : "",//'{"nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}}, "appscale_desktop_default": 1.0, "appscale_desktop_max": 1.4, "appscale_mobile_default": 1.4, "appscale_mobile_max": 1.4, "appscale_mobile_min": 1.0, "appscale_tablet_min": 1.0, "battle_wait_time": 60, "nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}},"websocketurl": "ws://127.0.0.1:5232","homefront_date":"2025.11.27-09.00.00"}',
                     ServerTime: DateTime.UtcNow.ToString("yyyy.MM.dd-HH.mm.ss"),
                     SovietLevel: 500,
                     SovietLevelClaimed: 500,
@@ -643,8 +642,8 @@ namespace fyserver
                             WinnerSide: ""
                         ),
                         StartingData: new StartingData(
-                            AllyFactionLeft: leftDeck.AllyFaction.ToLower(),
-                            AllyFactionRight: rightDeck.AllyFaction.ToLower(),
+                            AllyFactionLeft: leftDeck.AllyFaction,
+                            AllyFactionRight: rightDeck.AllyFaction,
                             CardBackLeft: leftDeck.CardBack,
                             CardBackRight: rightDeck.CardBack,
                             StartingHandLeft: match.LeftHand,
@@ -673,16 +672,17 @@ namespace fyserver
                 return match.MatchStartingInfo;
             }
             // 新增辅助方法：从卡组生成卡牌（简化版本）
-            (List<MatchCard> cards, MatchCard location) GetCardsFromDeck(Deck deck, int startId, bool isLeft)
+            (List<MatchCard> cards, MatchLocation location) GetCardsFromDeck(Deck deck, int startId, bool isLeft)
             {
                 var cards = new List<MatchCard>();
 
                 // 生成位置卡
-                var locationCard = new MatchCard(
+                var locationCard = new MatchLocation(
                     CardId: startId,
                     IsGold: false,
                     Location: isLeft ? "board_hqleft" : "board_hqright",
                     LocationNumber: 0,
+                    Faction: deck.MainFaction,
                     Name: a.DeckCodeTable[deck.DeckCode[^4..^2]].Card // 这里应该根据deck_code解析实际卡牌名
                 );
                 deck.DeckCode=deck.DeckCode.Remove(0, 5);
@@ -907,7 +907,6 @@ namespace fyserver
 
                 if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                     return Results.NotFound($"Match with ID {id} not found");
-
                 List<MatchCard> deck, hand;
                 if (user.Id == match.Left?.PlayerId)
                 {
@@ -936,14 +935,26 @@ namespace fyserver
                             var randomIndex = Random.Shared.Next(result.Deck.Count);
 
                             //// 交换位置
-                            //(result.Deck[randomIndex].Location, card.Location) =
-                            //    (card.Location, result.Deck[randomIndex].Location);
+                            // Use record 'with' to create new instances and preserve immutability.
+                            var deckCard = result.Deck[randomIndex];
 
-                            //(result.Deck[randomIndex].LocationNumber, card.LocationNumber) =
-                            //    (card.LocationNumber, result.Deck[randomIndex].LocationNumber);
+                            // The value added to ReplacementCards should reflect the deck card
+                            // but with the hand card's location info (matching previous tuple-swap behavior).
+                            var replacementCard = deckCard with
+                            {
+                                Location = card.Location,
+                                LocationNumber = card.LocationNumber
+                            };
 
-                            result.ReplacementCards.Add(result.Deck[randomIndex]);
-                            result.Deck[randomIndex] = card;
+                            // The deck slot will be replaced by the hand card but keep the original deck location info.
+                            var newDeckEntry = card with
+                            {
+                                Location = deckCard.Location,
+                                LocationNumber = deckCard.LocationNumber
+                            };
+
+                            result.ReplacementCards.Add(replacementCard);
+                            result.Deck[randomIndex] = newDeckEntry;
                             break;
                         }
                     }

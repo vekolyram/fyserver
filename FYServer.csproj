@@ -17,10 +17,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fleck" Version="1.2.0" />
     <PackageReference Include="LiteDB" Version="6.0.0-prerelease.75" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
     <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
+    <PackageReference Include="WatsonWebsocket" Version="4.1.8" />
   </ItemGroup>
 
   <ItemGroup>

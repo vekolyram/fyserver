@@ -118,7 +118,14 @@ namespace fyserver
         int LocationNumber,
         string Name
     );
-
+    public record MatchLocation (
+        int CardId,
+        bool IsGold,
+        string Location,
+        int LocationNumber,
+        string Name,
+        string Faction
+        );
     public record MulliganResult(
         List<MatchCard> Deck,
         List<MatchCard> ReplacementCards
@@ -139,8 +146,8 @@ namespace fyserver
         string LeftPlayerName,
         bool LeftPlayerOfficer,
         string LeftPlayerTag,
-        MatchCard? LocationCardLeft,
-        MatchCard? LocationCardRight,
+        MatchLocation? LocationCardLeft,
+        MatchLocation? LocationCardRight,
         int PlayerIdLeft,
         int PlayerIdRight,
         int PlayerStarsLeft,

@@ -65,7 +65,7 @@ namespace fyserver
         //public List<KeyValuePair<User, string>>? clients;
         public string getAddressWs()
         {
-            return "ws://127.0.0.1:"+portWs;
+            return "http://0.0.0.0:"+portWs;
         }
         public string getAddressWsR()
         {
