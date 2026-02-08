@@ -6,21 +6,50 @@ namespace fyserver
     public class http
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder();
+        public static async Task<int> GetPlayerIdFromAuthAsync(HttpContext context)
+        {
+            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+            if (authHeader == null) {
+                authHeader = context.Request.Headers["authorization"].FirstOrDefault();
+            }
+            User? a = null;
+            if (authHeader != null && authHeader.StartsWith("JWT "))
+                a = await GlobalState.users.GetByUserNameAsync(authHeader["JWT ".Length..]);
+            else
+                return 0;
+            if (a != null)
+            {
+                Console.WriteLine($"Authorization header found: {authHeader["JWT ".Length..]}");
+                return a.Id;
+            }
+            return 0;
+        }
+        public static async Task<User?> GetUserFromAuthAsync(HttpContext context)
+        {
+            var playerId = await GetPlayerIdFromAuthAsync(context);
+            Console.WriteLine($"Extracted player ID from auth: {playerId}");
+            if (playerId > 0)
+            {
+                // 纯粹的数据获取，不需要注入 UserStore
+                return await GlobalState.users.GetByIdAsync(playerId);
+            }
+            return null;
+        }
         async public Task StartHttpServer()
         {
-                a.InitLibrary("./library/deckCodeIDsTable2.json", "./library/emojiLib.json", "./library/cardbackLib.json");
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("XXXXXXXXXX");
-                Console.ForegroundColor = ConsoleColor.White;
-                builder.Services.AddOpenApi();
-                builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
-                builder.Services.AddEndpointsApiExplorer();
-                builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
-                {
-                    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-                });
-                builder.Services.AddRouting();
-                var app = builder.Build();
+            PlayerLibrary.InitLibrary("./library/deckCodeIDsTable2.json", "./library/emojiLib.json", "./library/cardbackLib.json");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("XXXXXXXXXX");
+            Console.ForegroundColor = ConsoleColor.White;
+            builder.Services.AddOpenApi();
+            builder.WebHost.UseUrls(config.appconfig.getAddressHttp());
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+            {
+                options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+            });
+            builder.Services.AddRouting();
+            var app = builder.Build();
             // 路径规范化中间件 - 处理双斜杠问题
             app.Use(async (context, next) =>
             {
@@ -65,21 +94,7 @@ namespace fyserver
             });
 
             // 辅助方法
-            async Task<int> GetPlayerIdFromAuthAsync(HttpContext context)
-            {
-                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-                User? a = null;
-                if (authHeader != null && authHeader.StartsWith("JWT "))
-                    a = await GlobalState.users.GetByUserNameAsync(authHeader["JWT ".Length..]);
-                else
-                    return 0;
-                if (a != null)
-                {
-                    Console.WriteLine($"Authorization header found: {authHeader["JWT ".Length..]}");
-                    return a.Id;
-                }
-                return 0;
-            }
+
             // 1. 会话管理
             app.MapPost("/session", async (Session session) =>
             {
@@ -203,7 +218,7 @@ namespace fyserver
                     Rewards: new List<object>(),
                     SeasonEnd: "2025-08-01T00:00:00Z",
                     SeasonWins: 9999,
-                    ServerOptions: File.Exists("./config/serverOptions.json") ? File.ReadAllText("./config/serverOptions.json").Replace("{WsAddress}",config.appconfig.getAddressWsR()) : "",//'{"nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}}, "appscale_desktop_default": 1.0, "appscale_desktop_max": 1.4, "appscale_mobile_default": 1.4, "appscale_mobile_max": 1.4, "appscale_mobile_min": 1.0, "appscale_tablet_min": 1.0, "battle_wait_time": 60, "nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}},"websocketurl": "ws://127.0.0.1:5232","homefront_date":"2025.11.27-09.00.00"}',
+                    ServerOptions: File.Exists("./config/serverOptions.json") ? File.ReadAllText("./config/serverOptions.json").Replace("{WsAddress}", config.appconfig.getAddressWsR()) : "",//'{"nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}}, "appscale_desktop_default": 1.0, "appscale_desktop_max": 1.4, "appscale_mobile_default": 1.4, "appscale_mobile_max": 1.4, "appscale_mobile_min": 1.0, "appscale_tablet_min": 1.0, "battle_wait_time": 60, "nui_mobile": 1, "scalability_override": {"Android_Low": {"console_commands": ["r.Screenpercentage 100"]}, "Android_Mid": {"console_commands": ["r.Screenpercentage 100"]}, "Android_High": {"console_commands": ["r.Screenpercentage 100"]}},"websocketurl": "ws://127.0.0.1:5232","homefront_date":"2025.11.27-09.00.00"}',
                     ServerTime: DateTime.UtcNow.ToString("yyyy.MM.dd-HH.mm.ss"),
                     SovietLevel: 500,
                     SovietLevelClaimed: 500,
@@ -238,17 +253,7 @@ namespace fyserver
                 return Results.Ok(response);
             });
             // 在 http.cs 中
-            async Task<User?> GetUserFromAuthAsync(HttpContext context)
-            {
-                var playerId = await GetPlayerIdFromAuthAsync(context);
-                Console.WriteLine($"Extracted player ID from auth: {playerId}");
-                if (playerId > 0)
-                {
-                    // 纯粹的数据获取，不需要注入 UserStore
-                    return await GlobalState.users.GetByIdAsync(playerId);
-                }
-                return null;
-            }
+
             // 2. 配置和基本信息
             app.MapGet("/", async (HttpContext context) =>
             {
@@ -332,7 +337,7 @@ namespace fyserver
             // 4. 卡牌库和卡组
             app.MapGet("/players/{id}/librarynew", (string id) =>
             {
-                return Results.Ok(a.Library);
+                return Results.Ok(PlayerLibrary.Library);
             });
 
             app.MapPost("/players/{id}/decks", async (string id, CreateDeck createDeck) =>
@@ -442,7 +447,7 @@ namespace fyserver
                 var response = new ItemsResponse(
                     Date: DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
         EquippedItems: user.EquippedItem,
-                    Items: a.Items.ToList()
+                    Items: PlayerLibrary.Items.ToList()
                 );
 
                 return Results.Ok(response);
@@ -601,14 +606,14 @@ namespace fyserver
                 match.LeftHand = leftCards.Take(4).Select((card, index) =>
                 {
                     card = card with { Location = "hand_left" };
-        //            card = card with { LocationNumber = index };
+                    //            card = card with { LocationNumber = index };
                     return card;
                 }).ToList();
 
                 match.RightHand = rightCards.Take(5).Select((card, index) =>
                 {
                     card = card with { Location = "hand_right" };
-//                    card = card with { LocationNumber = index };
+                    //                    card = card with { LocationNumber = index };
                     return card;
                 }).ToList();
 
@@ -683,16 +688,16 @@ namespace fyserver
                     Location: isLeft ? "board_hqleft" : "board_hqright",
                     LocationNumber: 0,
                     Faction: deck.MainFaction,
-                    Name: a.DeckCodeTable[deck.DeckCode[^4..^2]].Card // 这里应该根据deck_code解析实际卡牌名
+                    Name: PlayerLibrary.DeckCodeTable[deck.DeckCode[^4..^2]].Card // 这里应该根据deck_code解析实际卡牌名
                 );
-                deck.DeckCode=deck.DeckCode.Remove(0, 5);
+                deck.DeckCode = deck.DeckCode.Remove(0, 5);
                 Console.WriteLine(deck.DeckCode + locationCard.Name);
                 int cCount = 0;
                 while (!deck.DeckCode[0].Equals('~'))
                 {
-                    while ((!deck.DeckCode[0].Equals(';'))&& (!deck.DeckCode[0].Equals('~')))
+                    while ((!deck.DeckCode[0].Equals(';')) && (!deck.DeckCode[0].Equals('~')))
                     {
-                        var lkp = a.DeckCodeTable[deck.DeckCode.Substring(0, 2)];
+                        var lkp = PlayerLibrary.DeckCodeTable[deck.DeckCode.Substring(0, 2)];
                         deck.DeckCode = deck.DeckCode[2..];
                         for (short a = 0; a <= cCount; a++)
                             cards.Add(new MatchCard(
@@ -753,7 +758,7 @@ namespace fyserver
                     return Results.Ok(new { });
                 }
 
-                if (matchAction.Action == "lvl-loaded") 
+                if (matchAction.Action == "lvl-loaded")
                     return Results.Ok(new { otherPlayerReady = 1 });
 
                 if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
@@ -800,12 +805,12 @@ namespace fyserver
 
                 result["match"] = new
                 {
-                   player_status_left = match.PlayerStatusLeft,
+                    player_status_left = match.PlayerStatusLeft,
                     //player_status_right = match.PlayerStatusRight,
-                  //  player_status_left             = "mulligan_done",
+                    //  player_status_left             = "mulligan_done",
 
-                   //单人对战
-                player_status_right = "mulligan_done",
+                    //单人对战
+                    player_status_right = "mulligan_done",
                     status = "running"
                 };
 

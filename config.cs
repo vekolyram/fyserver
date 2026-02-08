@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Concurrent;
+using System.Net.WebSockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace fyserver
@@ -55,17 +56,20 @@ namespace fyserver
         public int portHttp = 5231;
         public bool bancheat = false;
         //public Random rand=new();
-        public ConcurrentBag<User> clients = [];
         public List<LobbyPlayer> WaitingPlayers1 = [];
         public List<LobbyPlayer> WaitingPlayers2 = [];
         public ConcurrentDictionary<string, List<LobbyPlayer>> BattleCodePlayers = [];
         public ConcurrentDictionary<int, MatchInfo> MatchedPairs = new();
-        public readonly ConcurrentDictionary<int, User> UsersById = new();
+        public readonly ConcurrentDictionary<int, WebSocket> UsersById = new();
         public string ip = "0.0.0.0";
         //public List<KeyValuePair<User, string>>? clients;
         public string getAddressWs()
         {
             return "http://0.0.0.0:"+portWs;
+        }
+        public string getAddressWs2()
+        {
+            return "ws://127.0.0.1:" + portWs;
         }
         public string getAddressWsR()
         {

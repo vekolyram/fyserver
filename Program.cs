@@ -11,14 +11,10 @@ config.appconfig.read();
  new http().StartHttpServer();
 await Task.Delay(2000);
 new ws().StartWsServerAsync();
-var options = new JsonSerializerOptions
-{
-    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-};
 ClientWebSocket webSocket = new ClientWebSocket();
-await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWsR()), CancellationToken.None);
-string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Message: "ss", Channel: "ping"), options);
-ws.SendString(webSocket, message);
+await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs2()), CancellationToken.None);
+string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Message: "Fuck!", Channel: "ping"), GameConstants.JsonOptions);
+ws.SendAsync(webSocket, message);
 var buffer = new byte[1024];
 List<byte> bs = new List<byte>();
 WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);

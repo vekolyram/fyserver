@@ -1,9 +1,10 @@
 ﻿using Newtonsoft.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using JsonIgnoreAttribute = System.Text.Json.Serialization.JsonIgnoreAttribute;
 namespace fyserver
 {
-    public class a
+    public class PlayerLibrary
     {
         class Card
         {
@@ -308,7 +309,7 @@ namespace fyserver
     );
     // WebSocket messages as records
     public record WebSocketMessage(
-        long Timestamp,
+        string Timestamp,
         string Message = "",
         string Channel = "",
         string Sender = "",
@@ -755,6 +756,11 @@ namespace fyserver
 
         // 动作类型
         public const string XActionCheat = "XActionCheat";
+        public static  readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            WriteIndented = false
+        };
     }
     // 游戏库和物品相关的record类型
     public record LibraryItem(
