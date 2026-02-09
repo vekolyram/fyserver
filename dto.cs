@@ -421,10 +421,14 @@ namespace fyserver
     }
     public class FasterUserStoreService : IDisposable
     {
-        private readonly FasterKvService _db;
+        public readonly FasterKvService _db;
         private readonly bool _ownsConnection;
         public void Record2() {
             _db.Checkpoint();
+        }
+        public void Record1()
+        {
+            _db.Checkpoint(FASTER.core.CheckpointType.FoldOver);
         }
         // 构造函数
         public FasterUserStoreService(FasterKvService dbService)

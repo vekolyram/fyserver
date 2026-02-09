@@ -8,12 +8,11 @@ namespace fyserver
         static readonly TextWriter nullWriter = TextWriter.Null;
         public static void StartCommandLoop()
         {
-            TempWriteLine("服务器已完整启动，按下C进入命令模式");
+            Console.WriteLine("服务器已完整启动，按下C进入命令模式");
             while (true)
             {
                 if (Console.ReadKey().Key == ConsoleKey.C)
                 {
-                    Console.SetOut(nullWriter);
                     while (true)
                     {
                         TempWriteLine("\n请输入命令：");
@@ -24,11 +23,22 @@ namespace fyserver
                                 GlobalState.ReloadStoreConfig();
                                 TempWriteLine("商店配置已重新加载。");
                                 break;
+                            case "savedbfo":
+                                GlobalState.users.Record1();
+                                TempWriteLine("已增量保存。");
+                                break;
+                            case "savedbss":
+                                GlobalState.users.Record2();
+                                TempWriteLine("已全量保存。");
+                                break;
                             case "clearusers":
+                                if(File.Exists("./YCDR"))
+                                    File.Delete("./YCDR");
+                                GlobalState.users._db.Clear();
                                 TempWriteLine("所有用户数据已清除。");
                                 break;
                             case "help":
-                                TempWriteLine("可用命令：reloadstore, clearusers, help, exit");
+                                TempWriteLine("可用命令：reloadstore, clearusers, help, savedb, exit");
                                 break;
                             case "exit":
                                 TempWriteLine("行");

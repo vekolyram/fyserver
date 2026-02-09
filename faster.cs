@@ -8,6 +8,7 @@ public class FasterKvService : IDisposable
     private ClientSession<string, string, string, string, Empty, IFunctions<string, string, string, string, Empty>> _session;
     private const string LogDirectory = "./faster-log";
     private readonly bool _verboseLogging;
+    private CheckpointType _checkpointType = CheckpointType.FoldOver;
     // System.Text.Json 序列化选项
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -17,9 +18,10 @@ public class FasterKvService : IDisposable
     };
 
     // 构造函数：初始化 FASTER KV
-    public FasterKvService(string logDirectory = "./faster-log", bool verboseLogging = false)
+    public FasterKvService(string logDirectory = "./faster-log", bool verboseLogging = false, CheckpointType checkpointType = CheckpointType.FoldOver)
     {
         _verboseLogging = verboseLogging;
+        _checkpointType = checkpointType;
 
         // 确保日志目录存在
         if (!Directory.Exists(logDirectory))
@@ -37,7 +39,7 @@ public class FasterKvService : IDisposable
 
         // 初始化 FASTER KV
         _fasterKv = new FasterKV<string, string>(
-            size: 1L << 20, // 1M 条记录的哈希表
+            size: (1L<<15), // 1M 条记录的哈希表
             logSettings: logSettings,
             checkpointSettings: new CheckpointSettings
             {
@@ -176,12 +178,27 @@ public class FasterKvService : IDisposable
     {
         // FASTER checkpointing API usage is environment/version dependent.
         // For now just ensure pending operations are completed.
-        _fasterKv.TakeFullCheckpointAsync(CheckpointType.Snapshot);
+        _fasterKv.TakeFullCheckpointAsync(_checkpointType);
         _session.CompletePending(true);
         if (_verboseLogging)
             Console.WriteLine("FasterKvService: CompletePending called for checkpoint.");
         if (!File.Exists("./YCDR"))
             File.Create("./YCDR").Dispose();
+    }
+
+    // Overload to request a specific checkpoint type at call time
+    public void Checkpoint(CheckpointType checkpointType)
+    {
+        _fasterKv.TakeFullCheckpointAsync(checkpointType);
+        _session.CompletePending(true);
+        if (_verboseLogging)
+            Console.WriteLine($"FasterKvService: CompletePending called for checkpoint (type={checkpointType}).");
+    }
+
+    // Allow changing the default checkpoint type at runtime
+    public void SetCheckpointType(CheckpointType checkpointType)
+    {
+        _checkpointType = checkpointType;
     }
 
     // 恢复到最后一次检查点
@@ -240,7 +257,7 @@ public class FasterKvService : IDisposable
     }
     public void Dispose()
     {
-         Checkpoint();
+         Checkpoint(CheckpointType.FoldOver);
         _session?.Dispose();
         _fasterKv?.Dispose();
     }
