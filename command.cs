@@ -24,9 +24,15 @@ namespace fyserver
                                 TempWriteLine("商店配置已重新加载。");
                                 break;
                             case "savedbfo":
-                                GlobalState.users.Record1();
-                                TempWriteLine("已增量保存。");
-                                break;
+                                if (File.Exists("./YCDR"))
+                                {
+                                    GlobalState.users.Record1();
+                                    TempWriteLine("已增量保存。");
+                                }
+                                else{
+                                    TempWriteLine("未曾全量保存过, 请调用savedbss进行一次全量保存");
+                                }
+                                    break;
                             case "savedbss":
                                 GlobalState.users.Record2();
                                 TempWriteLine("已全量保存。");

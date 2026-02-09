@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="faster-log\**" />
+    <Content Remove="faster-log\**" />
+    <EmbeddedResource Remove="faster-log\**" />
+    <None Remove="faster-log\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Remove="deckCodeIDsTable2.json" />
   </ItemGroup>
 

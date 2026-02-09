@@ -1,5 +1,4 @@
 ﻿using FASTER.core;
-using fyserver;
 using System.Text.Json;
 
 public class FasterKvService : IDisposable
@@ -28,18 +27,18 @@ public class FasterKvService : IDisposable
         {
             Directory.CreateDirectory(logDirectory);
         }
-            // 创建 FASTER KV 设置
-            var logSettings = new LogSettings
-            {
-                LogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.log")),
-                ObjectLogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.obj.log")),
-                PageSizeBits = 12, // 4KB 页面
-                MemorySizeBits = 20 // 1MB 内存
-            };
+        // 创建 FASTER KV 设置
+        var logSettings = new LogSettings
+        {
+            LogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.log")),
+            ObjectLogDevice = Devices.CreateLogDevice(Path.Combine(logDirectory, "hlog.obj.log")),
+            PageSizeBits = 12, // 4KB 页面
+            MemorySizeBits = 20 // 1MB 内存
+        };
 
         // 初始化 FASTER KV
         _fasterKv = new FasterKV<string, string>(
-            size: (1L<<15), // 1M 条记录的哈希表
+            size: (1L << 15), // 1M 条记录的哈希表
             logSettings: logSettings,
             checkpointSettings: new CheckpointSettings
             {
@@ -47,7 +46,8 @@ public class FasterKvService : IDisposable
                 RemoveOutdated = true
             }
         );
-        if (File.Exists("./YCDR")) {
+        if (File.Exists("./YCDR"))
+        {
             _fasterKv.Recover();
         }
         // 创建客户端会话
@@ -257,7 +257,8 @@ public class FasterKvService : IDisposable
     }
     public void Dispose()
     {
-         Checkpoint(CheckpointType.FoldOver);
+        if (File.Exists("./YCDR"))
+            Checkpoint(CheckpointType.FoldOver);
         _session?.Dispose();
         _fasterKv?.Dispose();
     }
