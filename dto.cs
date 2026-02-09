@@ -54,44 +54,6 @@ namespace fyserver
          string Value,
          string DeckCode
     );
-//    public class FPResponseObject
-//    {
-//        public FPResponseOO Content { get; set; }
-//        [JsonPropertyName("elementId")]
-//        public int ElementId { get; set; }
-//        [JsonPropertyName("endDate")]
-//        public string EndDate { get; set; } = "0001-01-01T00:00:00Z";
-//        [JsonPropertyName("startDate")]
-//        public string StartDate { get; set; } = "9999-01-01T00:00:00Z";
-//        [JsonPropertyName("isPublished")]
-//        public bool IsPublished { get; set; } = true;
-//        [JsonPropertyName("isTargeted")]
-//        public bool IsTargeted { get; set; } = false;
-//    };
-//    public record FPResponseOO(
-//    FPText BannerText,
-//    FPText Heading,
-//    Dictionary<string, string> Icon,
-//    string ImageUrl,
-//    string Link,
-//    int Priority,
-//    FPText SubHeading,
-//    int Type,
-//    int Slot
-//        );
-//    public record FPText(
-//           string Text="",
-//           int FontSize=56
-//        );
-//    public record FPResponse
-//(
-//List<FPResponseObject> Elements,
-//        List<FPResponseObject> Targeted,
-//bool Changed=true,
-//string Message="OK",
-//int StatusCode = 200
-//);
-    // Match DTOs as records
     public record LobbyPlayer(
         int PlayerId,
         int DeckId,
@@ -107,7 +69,9 @@ namespace fyserver
         Dictionary<string, object>? ActionData = null,
         int LocalSubactions = 0
     );
-
+    public record MatchActionEn (
+        string A
+    );
     public record MulliganCards(
         List<int> DiscardedCardIds
     );
@@ -750,10 +714,8 @@ namespace fyserver
         public const string Pending = "pending";
         public const string Running = "running";
         public const string Finished = "finished";
-
         public static readonly List<string> MainFactions = new() { "Germany", "Britain", "Soviet", "USA", "Japan" };
         public static readonly List<string> AllyFactions = new() { "Germany", "Britain", "Soviet", "USA", "Japan", "France", "Italy", "Poland", "Finland" };
-
         // 动作类型
         public const string XActionCheat = "XActionCheat";
         public static  readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -792,7 +754,6 @@ namespace fyserver
         string Message,
         int StatusCode
     );
-
     public record BannedResponse(
         Error Error,
         string Message,

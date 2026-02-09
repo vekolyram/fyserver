@@ -8,7 +8,7 @@ using System.Text.Json;
 
 
 config.appconfig.read();
- new http().StartHttpServer();
+new http().StartHttpServer();
 await Task.Delay(2000);
 new ws().StartWsServerAsync();
 ClientWebSocket webSocket = new ClientWebSocket();
@@ -30,8 +30,8 @@ if (result.EndOfMessage)
     bs = new List<byte>();
 }
 await webSocket.CloseAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
+Command.StartCommandLoop();
 Console.ReadLine();
-
 //var d = "%%24|060d0n1d1g1G1H1r1t1v7N7Y8U9g9n9qdDdEdze4efgsgtgvhThWjBjqowrht5tUtWw1w3wrwx;1b;;~;;;|0N1b";
 //d = d.Remove(0, 5);
 //var cards = new List<MatchCard>();
