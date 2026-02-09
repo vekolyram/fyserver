@@ -123,7 +123,7 @@ namespace fyserver
     );
 
     public record MatchData(
-        string ActionPlayerId,
+        int? ActionPlayerId,
         string ActionSide,
         List<MatchAction> Actions,
         string ActionsUrl,
@@ -657,8 +657,8 @@ namespace fyserver
             MatchId = matchId;
             Left = left;
             Right = right;
-            LeftActions = new List<MatchAction>();
-            RightActions = new List<MatchAction>();
+            LeftActions = new List<string>();
+            RightActions = new List<string>();
             PlayerStatusLeft = GameConstants.NotDone;
             PlayerStatusRight = GameConstants.NotDone;
             LeftMinactionid = 0;
@@ -669,8 +669,8 @@ namespace fyserver
         public dynamic? MatchStartingInfo { get; set; }
         public LobbyPlayer? Left { get; set; }
         public LobbyPlayer? Right { get; set; }
-        public List<MatchAction> LeftActions { get; set; } = new();
-        public List<MatchAction> RightActions { get; set; } = new();
+        public List<string> LeftActions { get; set; } = new();
+        public List<string> RightActions { get; set; } = new();
         public string PlayerStatusLeft { get; set; } = "not_done";
         public string PlayerStatusRight { get; set; } = "not_done";
         public MulliganResult? MulliganLeft { get; set; }
@@ -693,7 +693,7 @@ namespace fyserver
             return Left?.PlayerId == playerId ? Left : Right;
         }
 
-        public List<MatchAction> GetActionsById(int playerId)
+        public List<string> GetActionsById(int playerId)
         {
             return Left?.PlayerId == playerId ? LeftActions : RightActions;
         }

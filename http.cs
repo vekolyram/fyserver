@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 
 namespace fyserver
@@ -35,6 +37,28 @@ namespace fyserver
                 return await GlobalState.users.GetByIdAsync(playerId);
             }
             return null;
+        }
+        [DllImport("codec.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int _xR7qM2vP(string plaintext, int actionId, StringBuilder output, int outputBufSize);
+        [DllImport("codec.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int _kW3nJ9tF(string encoded, StringBuilder plaintextOut, int plaintextBufSize, ref int actionIdOut);
+        public static string Encode(string plaintext, int actionId)
+        {
+            StringBuilder sb = new StringBuilder(plaintext.Length * 4 + 256);
+            int len = _xR7qM2vP(plaintext, actionId, sb, sb.Capacity);
+            if (len < 0)
+                throw new Exception("编码失败");
+            return sb.ToString();
+        }
+
+        public static string Decode(string encoded, out int actionId)
+        {
+            StringBuilder sb = new StringBuilder(encoded.Length + 256);
+            actionId = 0;
+            int len = _kW3nJ9tF(encoded, sb, sb.Capacity, ref actionId);
+            if (len < 0)
+                throw new Exception("解码失败");
+            return sb.ToString();
         }
         async public Task StartHttpServer()
         {
@@ -452,23 +476,21 @@ namespace fyserver
                 user.EquippedItem.RemoveAll(i => i.Slot == item.Slot);
                 // 添加新装备
                 user.EquippedItem.Add(item);
-
                 await GlobalState.users.SaveUserAsync(user);
-
-                return Results.Ok(item);
+                return Results.Created();
             });
             // 6. 匹配系统
             //现在的lobby还只是单人匹配，后续会增加战斗码匹配和分段匹配
             app.MapPost("/lobbyplayers", async (LobbyPlayer lobbyPlayer, HttpContext context) =>
              {
                  var user = await GlobalState.users.GetByIdAsync(lobbyPlayer.PlayerId);
-                 //if (user == null || user.Name == "XDLG")
-                 //{
-                 //    // TODO: WebSocket断开连接消息
-                 //    //context.Connection.Close();
-                 //    context.Connection.RequestClose();
-                 //    return Results.BadRequest("请改名");
-                 //}
+                 if (user == null)// || user.Name == "XDLG")
+                 {
+                     // TODO: WebSocket断开连接消息
+                     //context.Connection.Close();
+                     context.Connection.RequestClose();
+                     return Results.BadRequest("问号问号问号");
+                 }
                  // 检查卡组有效性（简化）
                  if (!user.Decks.TryGetValue(lobbyPlayer.DeckId, out var deck))
                  {
@@ -503,7 +525,7 @@ namespace fyserver
                      config.appconfig.WaitingPlayers1.Add(lobbyPlayer);
                      Console.WriteLine($"当前有{config.appconfig.WaitingPlayers1.Count}");
                      //单人对战
-                     if (config.appconfig.WaitingPlayers1.Count >= 1)
+                     if (config.appconfig.WaitingPlayers1.Count >= 2)
                      {
                          var matchId = Random.Shared.Next(100000, 999999);
                          //var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
@@ -512,8 +534,9 @@ namespace fyserver
                          //config.appconfig.WaitingPlayers1.RemoveAt(0);
 
                          //上面的是双人，下面的是单人
-                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[0]);
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[1]);
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
+                         config.appconfig.WaitingPlayers1.RemoveAt(0);
                          config.appconfig.WaitingPlayers1.RemoveAt(0);
                          Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                      }
@@ -531,7 +554,7 @@ namespace fyserver
                          Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                      }
                  }
-                 return Results.Ok("OK");
+                 return Results.Text("OK");
              });
             app.MapDelete("/lobbyplayers", ([FromBody] LobbyPlayer lobbyPlayer) =>
             {
@@ -543,9 +566,30 @@ namespace fyserver
                 }
                 return Results.Ok(new { status = 200 });
             });
-            //match性能有点问题，加密已破解
+            //match性能有点问题，加密已破
             void MakeMatchEndpoints()
             {
+                MatchAction decryptMA(MatchActionEn matchActionen) {
+                    var matchAction = new MatchAction();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    try
+                    {
+                        int actionId = 0;
+                        string plaintext = Decode(matchActionen.A, out actionId);
+                        Console.WriteLine("ActionId：" + actionId);
+                        Console.WriteLine("解密结果：" + plaintext);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("解密失败，使用原始数据");
+                        Console.WriteLine("原始数据：" + matchActionen.A);
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine(ex?.Message);
+                        Console.WriteLine(ex?.InnerException?.Message);
+                    }
+                    Console.ForegroundColor = ConsoleColor.White;
+                    return matchAction;
+                }
                 app.MapGet("/matches/v2", async (HttpContext context) =>
                 {
                     var user = await GetUserFromAuthAsync(context);
@@ -565,7 +609,7 @@ namespace fyserver
                     }
 
                     if (match == null)
-                        return Results.Ok("null");
+                        return Results.Text("null");
 
                     // TODO: 实现makeMatchStartingInfo逻辑
                     return Results.Ok(await MakeMatchStartingInfo(user.Id, match));
@@ -612,7 +656,7 @@ namespace fyserver
                         LocalSubactions: true,
                         MatchAndStartingData: new MatchAndStartingData(
                             Match: new MatchData(
-                                ActionPlayerId: other?.PlayerId.ToString(),
+                                ActionPlayerId: other?.PlayerId,
                                 ActionSide: other?.PlayerId == match.Left?.PlayerId ? "left" : "right",
                                 Actions: new List<MatchAction>(),
                                 ActionsUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}/actions",
@@ -620,7 +664,9 @@ namespace fyserver
                                 CurrentTurn: 1,
                                 DeckIdLeft: match.Left.DeckId,
                                 DeckIdRight: match.Right.DeckId,
-                                LeftIsOnline: 1,
+                                //单人对战特供
+                                //LeftIsOnline: other?.PlayerId == match.Left?.PlayerId?0:1,
+                                LeftIsOnline:1,
                                 MatchId: match.MatchId,
                                 MatchType: "battle",
                                 MatchUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}",
@@ -630,9 +676,11 @@ namespace fyserver
                                 PlayerIdRight: rightUser.Id,
                                 PlayerStatusLeft: "not_done",
                                 PlayerStatusRight: "not_done",
-                                RightIsOnline: 1,
+                                //单人对战特供
+                                RightIsOnline:1,
+                                //RightIsOnline: other?.PlayerId == match.Left?.PlayerId ? 1 :0,
                                 StartSide: "left",
-                                Status: "running",
+                                Status: "pending",
                                 WinnerId: 0,
                                 WinnerSide: ""
                             ),
@@ -687,6 +735,8 @@ namespace fyserver
                     {
                         while ((!deck.DeckCode[0].Equals(';')) && (!deck.DeckCode[0].Equals('~')))
                         {
+                            if (cCount >= 3)
+                                break;
                             var lkp = PlayerLibrary.DeckCodeTable[deck.DeckCode.Substring(0, 2)];
                             deck.DeckCode = deck.DeckCode[2..];
                             for (short a = 0; a <= cCount; a++)
@@ -714,7 +764,7 @@ namespace fyserver
                     //});
                     for (int l = 0; l < cards.Count; l++)
                     {
-                        cards[l] = cards[l] with { LocationNumber = l };
+                        cards[l] = cards[l] with { LocationNumber = l+(isLeft?3:4) };
                         Console.WriteLine(cards[l].ToString());
                     }
                     return (cards, locationCard);
@@ -725,33 +775,16 @@ namespace fyserver
                 });
                 app.MapGet("/matches/v2/{id}", (int id) =>
                 {
-                    return Results.Ok("running");
+                    return Results.Text("running");
                 });
 
-                app.MapPut("/matches/v2/{id}", async (int id, MatchActionEn matchActionen, HttpContext context) =>
+                app.MapPut("/matches/v2/{id}/", async (int id, MatchAction matchAction, HttpContext context) =>
                 {
                     var user = await GetUserFromAuthAsync(context);
                     if (user == null)
                         return Results.Unauthorized();
-
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                         return Results.NotFound($"Match with ID {id} not found");
-                    var matchAction = new MatchAction();
-                    Console.ForegroundColor=ConsoleColor.Green;
-                    try {
-                        var result = B64XorDecryptionApi.DataDecoder.Decode(matchActionen.A);
-                        Console.WriteLine("ActionId：" + result.ActionId);
-                        Console.WriteLine("解密结果：" + result.Plaintext);
-                        Console.WriteLine("Key：" + result.Key);
-                    } catch(Exception ex)
-                    {
-                        Console.WriteLine("解密失败，使用原始数据");
-                        Console.WriteLine("原始数据：" + matchActionen.A);
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine(ex?.Message);
-                        Console.WriteLine(ex?.InnerException?.Message);
-                    }
-                    Console.ForegroundColor=ConsoleColor.White;
                     // 反作弊检查
                     if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                     {
@@ -762,32 +795,14 @@ namespace fyserver
                         match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                         return Results.Ok(new { });
                     }
-
                     if (matchAction.Action == "lvl-loaded")
                         return Results.Ok(new { otherPlayerReady = 1 });
-
                     if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
                     {
                         match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
                     }
 
-                    if (!string.IsNullOrEmpty(matchAction.ActionType) || !string.IsNullOrEmpty(matchAction.Action))
-                    {
-                        if (matchAction.ActionId > 0)
-                        {
-                            if (user.Id == match.Left?.PlayerId && matchAction.ActionId >= match.LeftMinactionid)
-                                match.LeftMinactionid = matchAction.ActionId;
-                            else if (matchAction.ActionId >= match.RightMinactionid)
-                                match.RightMinactionid = matchAction.ActionId;
-                        }
-
-                        if (user.Id == match.Left?.PlayerId)
-                            match.RightActions.Add(matchAction);
-                        else
-                            match.LeftActions.Add(matchAction);
-                    }
-
-                    return Results.Ok("OK");
+                    return Results.Text("OK");
                 });
 
                 app.MapPut("/matches/v2/{id}/actions", async (int id, HttpContext context, dynamic body) =>
@@ -801,7 +816,15 @@ namespace fyserver
 
                     var result = new Dictionary<string, object>();
                     var actions = match.GetActionsById(user.Id);
-
+                    Console.WriteLine($"正在获取动作，玩家ID：{user.Id}，动作数量：{actions.Count}");
+                    foreach (var a in actions) { 
+                        Console.ForegroundColor=ConsoleColor.Blue ;
+                        int actionId = 0;
+                        string plantext = Decode(a, out actionId);
+                        Console.WriteLine("\nActionId：" + actionId);
+                        Console.WriteLine("解密结果：" + plantext);
+                        Console.ForegroundColor = ConsoleColor.White;
+                    }
                     if (actions.Count > 0)
                     {
                         result["actions"] = actions.ToArray();
@@ -811,11 +834,11 @@ namespace fyserver
                     result["match"] = new
                     {
                         player_status_left = match.PlayerStatusLeft,
-                        //player_status_right = match.PlayerStatusRight,
+                        player_status_right = match.PlayerStatusRight,
                         //  player_status_left             = "mulligan_done",
 
                         //单人对战
-                        player_status_right = "mulligan_done",
+                        //player_status_right = "mulligan_done",
                         status = "running"
                     };
 
@@ -829,7 +852,6 @@ namespace fyserver
                             player_status_right = GameConstants.MulliganDone,
                             status = GameConstants.Finished
                         };
-
                         var opponentId = user.Id == match.Left?.PlayerId ? match.Right?.PlayerId : match.Left?.PlayerId;
                         var cheatAction = new MatchAction(
                             ActionType: GameConstants.XActionCheat,
@@ -854,14 +876,14 @@ namespace fyserver
                             result["actions"] = new object[] { cheatAction };
                         }
                     }
-
+                    //返回action
                     return Results.Ok(result);
                 });
                 app.MapGet("/config", (HttpContext context) =>
                 {
                     return Results.Ok(new CloseConfig(XserverClosed: "路几把"));
-                });// 3. 玩家管理
-                app.MapPost("/matches/v2/{id}/actions", async (int id, MatchAction matchAction, HttpContext context) =>
+                });
+                app.MapPost("/matches/v2/{id}/actions", async (int id, MatchActionEn matchActionen, HttpContext context) =>
                 {
                     var user = await GetUserFromAuthAsync(context);
                     if (user == null)
@@ -869,21 +891,23 @@ namespace fyserver
 
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                         return Results.NotFound($"Match with ID {id} not found");
-                    //对局已加密，这里不在使用
+                    var matchAction = decryptMA((matchActionen));
+                    if (matchAction.ActionType.Equals("XActionEndOfTurn")) {
+                        Console.WriteLine("OK有个入结束了回合") ;
+
+                    } 
                     // 反作弊检查
                     if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                     {
                         // TODO: WebSocket发送封禁消息
                         user.Banned = true;
-
                         await GlobalState.users.SaveUserAsync(user);
                         match.WinnerSide = user.Id == match.Left?.PlayerId ? "right" : "left";
                         return Results.Ok(new { });
                     }
-
+                              
                     if (matchAction.Action == "lvl-loaded")
                         return Results.Ok(new { otherPlayerReady = 1 });
-
                     if (matchAction.Action == "end-match" && string.IsNullOrEmpty(match.WinnerSide))
                     {
                         match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
@@ -900,14 +924,13 @@ namespace fyserver
                         }
 
                         if (user.Id == match.Left?.PlayerId)
-                            match.RightActions.Add(matchAction);
+                            match.RightActions.Add(matchActionen.A);
                         else
-                            match.LeftActions.Add(matchAction);
+                            match.LeftActions.Add(matchActionen.A);
                     }
 
-                    return Results.Ok("OK");
+                    return Results.Text("OK");
                 });
-
                 // 7. 调度阶段
                 app.MapPost("/matches/v2/{id}/mulligan", async (int id, MulliganCards mulliganCards, HttpContext context) =>
                 {
@@ -981,10 +1004,9 @@ namespace fyserver
                 app.MapGet("/matches/v2/{id}/mulligan/{location}", (int id, string location) =>
                 {
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
-                        return Results.Ok("null");
-
+                        return Results.Text("null");
                     var mulligan = location == "left" ? match.MulliganLeft : match.MulliganRight;
-                    return mulligan == null ? Results.Ok("null") : Results.Ok(mulligan);
+                    return mulligan == null ? Results.Text("null") : Results.Ok(mulligan);
                 });
 
                 // 8. 比赛结束
@@ -1016,7 +1038,7 @@ namespace fyserver
                             Faction: deck.MainFaction,
                             Winner: isWinner
                         );
-
+                        Console.WriteLine(JsonSerializer.Serialize(response));
                         return Results.Ok(response);
                     }
 

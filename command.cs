@@ -44,8 +44,11 @@ namespace fyserver
                                 TempWriteLine("所有用户数据已清除。");
                                 break;
                             case "help":
-                                TempWriteLine("可用命令：reloadstore, clearusers, help, savedb, exit");
+                                TempWriteLine("可用命令：reloadstore, clearusers, help, savedb, exit, exitall");
                                 break;
+                            case "exitall":
+                                TempWriteLine("行");
+                                return;
                             case "exit":
                                 TempWriteLine("行");
                                 goto resume;
