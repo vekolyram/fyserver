@@ -65,7 +65,7 @@ namespace fyserver
         string ActionType = "",
         int ActionId = 0,
         Dictionary<string, object>? Value = null,
-        string? PlayerId = null,
+        int? PlayerId = null,
         Dictionary<string, object>? ActionData = null,
         int LocalSubactions = 0
     );

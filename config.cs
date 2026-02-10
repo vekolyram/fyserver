@@ -83,20 +83,19 @@ namespace fyserver
         {
             return "http://" + ip + ":" + portHttp.ToString();
         }
-        public async Task<Config> getConfigAsync(string auth)
+        public async Task<Config> getConfigAsync(User? user)
         {
             CurrentUser? currentUser = null;
-                string authToken = auth["JWT ".Length..];
-            if (auth != "1939Mother")
+                var userName= user?.UserName ?? "1939Mother";
+            var jwt = http.Encode(userName,114);
+            if (userName != "1939Mother")
             {
-                User? user = await GlobalState.users.GetByUserNameAsync(authToken);
                 currentUser = new CurrentUser(
                     // TS 对应: "client_id": user.id
                     ClientId: user.Id,
                     // TS 对应: "exp": user.id
                     Exp: 1770289815,
-                    // TS 对应: "external_id": auth.slice (8) -> 即用户名
-                    ExternalId: authToken,
+                    ExternalId: userName.ToString(),
                     Iat: 1770289815,
                     // TS 对应: "identity_id": user.id
                     IdentityId: user.Id,
@@ -105,7 +104,6 @@ namespace fyserver
                     // TS 对应: "language": user.locale
                     Language: user.Locale,
                     Payment: "notavailable",
-                    // TS 对应: "player_id": user.id
                     // 注意：你的 Record 定义 PlayerId 是 string，所以这里要 ToString ()
                     PlayerId: user.Id.ToString(),
                     Provider: "device_id",
@@ -113,8 +111,7 @@ namespace fyserver
                     Tier: "LIVE",
                     // TS 对应: "user_id": user.id
                     UserId: user.Id,
-                    // TS 对应: "user_name": auth.slice (8)
-                    UserName: authToken
+                    UserName: userName
                 );
             }
             var config1 = new Config(
@@ -125,9 +122,9 @@ namespace fyserver
                            Lobbyplayers: $"{getAddressHttpR()}/lobbyplayers",
                            Matches: $"{getAddressHttpR()}/matches",
                            Matches2: $"{getAddressHttpR()}/matches/v2/",
-                           MyDraft: auth.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/draft/{authToken}",
-                           MyItems: auth.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/items/{authToken}",
-                           MyPlayer: auth.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/players/{authToken}",
+                           MyDraft: userName.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/draft/{jwt}",
+                           MyItems: userName.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/items/{jwt}",
+                           MyPlayer: userName.Equals("1939Mother") ? "" : $"{getAddressHttpR()}/players/{jwt}",
                            Players: $"{getAddressHttpR()}/players",
                            Purchase: $"{getAddressHttpR()}/store/v2/txn",
                            Root: getAddressHttpR(),
