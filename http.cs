@@ -512,7 +512,7 @@ namespace fyserver
                  // 对战码匹配
                  if (lobbyPlayer.ExtraData.StartsWith("battle_code:"))
                  {
-                     var code = lobbyPlayer.ExtraData;
+                     var code = lobbyPlayer.ExtraData["battle_code:".Length..];
                      if (!config.appconfig.BattleCodePlayers.ContainsKey(code))
                          config.appconfig.BattleCodePlayers[code] = new List<LobbyPlayer>();
 
@@ -522,7 +522,7 @@ namespace fyserver
                      if (players.Count >= 2)
                      {
                          var matchId = Random.Shared.Next(100000, 999999);
-                         var matchInfo = new MatchInfo(matchId, players[0], players[1]);
+                         var matchInfo = new MatchInfo(matchId, players[0], players[1],"bc"+code);
                          players.RemoveAt(0);
                          players.RemoveAt(0);
 
@@ -545,7 +545,7 @@ namespace fyserver
                          //config.appconfig.WaitingPlayers1.RemoveAt(0);
 
                          //上面的是双人，下面的是单人
-                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[0]);
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers1[0], config.appconfig.WaitingPlayers1[0],"pw");
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
                          config.appconfig.WaitingPlayers1.RemoveAt(0);
                          //config.appconfig.WaitingPlayers1.RemoveAt(0);
@@ -558,7 +558,7 @@ namespace fyserver
                      if (config.appconfig.WaitingPlayers2.Count >= 2)
                      {
                          var matchId = Random.Shared.Next(100000, 999999);
-                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1]);
+                         var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1],"xx");
                          config.appconfig.WaitingPlayers2.RemoveAt(0);
                          config.appconfig.WaitingPlayers2.RemoveAt(0);
                          config.appconfig.MatchedPairs[matchId] = matchInfo;
@@ -741,31 +741,29 @@ namespace fyserver
                         Name: PlayerLibrary.DeckCodeTable[deck.DeckCode[^4..^2]].Card // 这里应该根据deck_code解析实际卡牌名
                     );
                     deck.DeckCode = deck.DeckCode.Remove(0, 5);
-                    int cCount = 1;
-                    foreach (var item in deck.DeckCode.Split(';'))
-                    {
-                        if (cCount >= 5)
-                            break;
-                        var a = (item.Chunk(2).Select(chunk => { return string.Concat(chunk).Length == 2 ? (PlayerLibrary.DeckCodeTable[string.Concat(chunk)]) : null ; }));
-                        foreach (var lkp in a)
+                    deck.DeckCode.Split(';').Take(4).Select((item, index) => new{ Item = item, RepeatCount = index}).ToList() .ForEach(x =>
                         {
-                            if (lkp == null)
-                                continue;
-                            Console.WriteLine(lkp.DeckCodeId);
-                            cards.AddRange(Enumerable.Repeat(new MatchCard(
-                                CardId: startId++,
-                                IsGold: false,
-                                Location: isLeft ? "deck_left" : "deck_right",
-                                LocationNumber: 0,
-                                Name: lkp.Card
-                            ),cCount));
-
-                        }
-                        cCount++;
-                    }
+                            foreach (var chunk in x.Item.Chunk(2))
+                            {
+                                if (chunk.Length != 2) return;
+                                var key = string.Concat(chunk);
+                                if (!PlayerLibrary.DeckCodeTable.TryGetValue(key, out var lkp)) return;
+                                Console.Write(lkp.DeckCodeId);
+                                for (int i = 0; i <= x.RepeatCount; i++)
+                                {
+                                    cards.Add(new MatchCard(
+                                        CardId: startId++,
+                                        IsGold: false,
+                                        Location: isLeft ? "deck_left" : "deck_right",
+                                        LocationNumber: 0,
+                                        Name: lkp.Card
+                                    ));
+                                }
+                            }
+                        });
                     Console.WriteLine(cards.Count);
                     Console.WriteLine(JsonSerializer.Serialize(cards));
-                    cards = cards.OrderBy(_ => Random.Shared.Next()).Select((a, l) => { return a with { LocationNumber = l + (isLeft ? 4 : 5) }; }).ToList();
+                    cards = [.. cards.OrderBy(_ => Random.Shared.Next()).Select((a, l) => { return a with { LocationNumber = l + (isLeft ? 4 : 5) }; })];
                     return (cards, locationCard);
                 }
                 app.MapGet("/matches/v2/reconnect", () =>
@@ -800,7 +798,6 @@ namespace fyserver
                     {
                         match.WinnerSide = matchAction.Value?["winner_side"]?.ToString();
                     }
-
                     return Results.Text("OK");
                 });
 
@@ -812,7 +809,6 @@ namespace fyserver
 
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                         return Results.NotFound($"Match with ID {id} not found");
-
                     var result = new Dictionary<string, object>();
                     var actions = match.GetActionsById(user.Id);
                     Console.WriteLine($"正在获取动作，玩家ID：{user.Id}，动作数量：{actions.Count}");
@@ -832,11 +828,9 @@ namespace fyserver
                     result["match"] = new
                     {
                         player_status_left = match.PlayerStatusLeft,
-                        player_status_right = match.PlayerStatusRight,
-                        //  player_status_left             = "mulligan_done",
+                    //单人对战
+                        player_status_right = match.Ex.Equals("pw")?"mulligan_done":match.PlayerStatusRight,
 
-                        //单人对战
-                       //player_status_right = "mulligan_done",
                         status = "running"
                     };
 
@@ -879,7 +873,13 @@ namespace fyserver
                 });
                 app.MapGet("/config", (HttpContext context) =>
                 {
-                    return Results.Ok(new CloseConfig(XserverClosed: "路几把"));
+                    return Results.Ok(new
+                    {
+                        XserverClosed = "",
+                        XserverClosedHeader = "Server maintenance",
+                        ForgotPasswordUrl = "https://pornhub.com"
+                    }
+                    );
                 });
                 app.MapPost("/matches/v2/{id}/actions", async (int id, MatchActionEn matchActionen, HttpContext context) =>
                 {
@@ -968,7 +968,6 @@ namespace fyserver
                             if (card.CardId == cardId)
                             {
                                 var randomIndex = Random.Shared.Next(result.Deck.Count);
-
                                 //// 交换位置
                                 // Use record 'with' to create new instances and preserve immutability.
                                 var deckCard = result.Deck[randomIndex];
@@ -1006,12 +1005,15 @@ namespace fyserver
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
                         return Results.Text("null");
                     var mulligan = location == "left" ? match.MulliganLeft : match.MulliganRight;
-                    //单人
-                    //mulligan=new MulliganResult(
-                    //    Deck: match.RightDeck,
-                    //    ReplacementCards: new List<MatchCard>()
-                    //);
-                    //单人结束
+                    if (match.Ex.Equals("pw"))
+                    {
+                       //单人
+                        mulligan=new MulliganResult(
+                           Deck: match.RightDeck,
+                           ReplacementCards: new List<MatchCard>()
+                        );
+                        //单人结束
+                    }
                     return mulligan == null ? Results.Text("null") : Results.Ok(mulligan);
                 });
                 // 8. 比赛结束

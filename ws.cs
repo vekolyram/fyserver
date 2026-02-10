@@ -119,6 +119,7 @@ namespace fyserver
         {
             try
             {
+                Console.WriteLine($"收到消息: {message}");
                 var msg = JsonSerializer.Deserialize<WebSocketMessage>(message,GameConstants.JsonOptions);
                 if (msg == null) return;
                 var r = 0;
@@ -129,7 +130,6 @@ namespace fyserver
                         (
                             Message : "pong",
                             Channel : "ping",
-                            Context : "",
                             Timestamp : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(),
                             Sender :clientId.ToString(),
                             Receiver : ""
@@ -179,7 +179,7 @@ namespace fyserver
                                         Receiver: msg.Receiver
                                     );
                             if (msg.Message == "im_here")
-                                response = response with { Context = "" };
+                                response = response with { Context ="" };
                             _ = SendObjAsync(notificationClient,response);
                         }
                         break;
@@ -213,7 +213,7 @@ namespace fyserver
         public static async Task SendObjAsync<T>(WebSocket c, T a)
         {
             await SendAsync(c, JsonSerializer.Serialize(a, GameConstants.JsonOptions));
-            Console.WriteLine(a.ToString());
+            Console.WriteLine("发送:"+a.ToString());
         }
     }
 }

@@ -223,11 +223,6 @@ namespace fyserver
         int UserId,
         string UserName
     );
-    public record CloseConfig(
-       string XserverClosed = "",
-        string XserverClosedHeader = "Server maintenance",
-        string ForgotPasswordUrl = "https://pornhub.com"
-    );
     public record Endpoints(
         string Draft,
         string Email,
@@ -274,11 +269,11 @@ namespace fyserver
     // WebSocket messages as records
     public record WebSocketMessage(
         string Timestamp,
+        string Context="",
         string Message = "",
         string Channel = "",
         string Sender = "",
         string Receiver = "",
-        string Context = "",
         int? MatchId = null
     );
 
@@ -652,7 +647,7 @@ namespace fyserver
         {
         }
 
-        public MatchInfo(int matchId, LobbyPlayer left, LobbyPlayer right)
+        public MatchInfo(int matchId, LobbyPlayer left, LobbyPlayer right,string ex)
         {
             MatchId = matchId;
             Left = left;
@@ -661,11 +656,13 @@ namespace fyserver
             RightActions = new List<string>();
             PlayerStatusLeft = GameConstants.NotDone;
             PlayerStatusRight = GameConstants.NotDone;
+            Ex = ex;
             LeftMinactionid = 0;
             RightMinactionid = 0;
             //MatchStartingInfo = new(new(left.PlayerId,"left",new(),config.appconfig.getAddressHttpR()+"/matches/v2/"+matchId+"/actions",0,0,left.DeckId,right.DeckId,1,matchId,"", config.appconfig.getAddressHttpR() + "/matches/v2/" +,DateTimeOffset.UtcNow.ToString(),new(),left.PlayerId,right.PlayerId,GameConstants.R),new());
         }
         public int MatchId { get; set; }
+        public string Ex { get; set; } = "";
         public dynamic? MatchStartingInfo { get; set; }
         public LobbyPlayer? Left { get; set; }
         public LobbyPlayer? Right { get; set; }
@@ -695,7 +692,8 @@ namespace fyserver
 
         public List<string> GetActionsById(int playerId)
         {
-            return Left?.PlayerId == playerId ? LeftActions : RightActions;
+            //aaaa单
+           return Left?.PlayerId == playerId&&!Ex.Equals("pw") ? RightActions : LeftActions;
         }
     }
     // 静态常量和工具类

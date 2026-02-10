@@ -13,7 +13,7 @@ await Task.Delay(2000);
 new ws().StartWsServerAsync();
 ClientWebSocket webSocket = new ClientWebSocket();
 await webSocket.ConnectAsync(new Uri(config.appconfig.getAddressWs2()), CancellationToken.None);
-string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Message: "Fuck!", Channel: "ping"), GameConstants.JsonOptions);
+string message = JsonSerializer.Serialize(new WebSocketMessage(Timestamp: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(), Message: "Fuck!", Channel: "ping",Context:null), GameConstants.JsonOptions);
 ws.SendAsync(webSocket, message);
 var buffer = new byte[1024];
 List<byte> bs = new List<byte>();
