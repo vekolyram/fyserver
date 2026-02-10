@@ -69,6 +69,16 @@ namespace fyserver
         Dictionary<string, object>? ActionData = null,
         int LocalSubactions = 0
     );
+    public record ServerMatchAction  (
+         int TurnNumer ,
+         List<Object> SubActions ,
+          string Action = "",
+        string ActionType = "",
+        int ActionId = 0,
+        Dictionary<string, object>? Value = null,
+        int? PlayerId = null,
+        Dictionary<string, object>? ActionData = null
+    );
     public record MatchActionEn (
         string A
     );
@@ -104,7 +114,7 @@ namespace fyserver
         List<MatchCard> StartingHandLeft,
         List<MatchCard> StartingHandRight,
         List<MatchCard> DeckLeft,
-        List<MatchCard> DeckRight,
+        List<MatchCard> DeckRight, 
         List<string> EquipmentLeft,
         List<string> EquipmentRight,
         bool IsAiMatch,
@@ -652,8 +662,8 @@ namespace fyserver
             MatchId = matchId;
             Left = left;
             Right = right;
-            LeftActions = new List<string>();
-            RightActions = new List<string>();
+            LeftActions = new ();
+            RightActions = new ();
             PlayerStatusLeft = GameConstants.NotDone;
             PlayerStatusRight = GameConstants.NotDone;
             Ex = ex;
@@ -666,8 +676,9 @@ namespace fyserver
         public dynamic? MatchStartingInfo { get; set; }
         public LobbyPlayer? Left { get; set; }
         public LobbyPlayer? Right { get; set; }
-        public List<string> LeftActions { get; set; } = new();
-        public List<string> RightActions { get; set; } = new();
+        public int Turns { get; set; } = 0;
+        public List<ServerMatchAction> LeftActions { get; set; } = new();
+        public List<ServerMatchAction> RightActions { get; set; } = new();
         public string PlayerStatusLeft { get; set; } = "not_done";
         public string PlayerStatusRight { get; set; } = "not_done";
         public MulliganResult? MulliganLeft { get; set; }
@@ -690,7 +701,7 @@ namespace fyserver
             return Left?.PlayerId == playerId ? Left : Right;
         }
 
-        public List<string> GetActionsById(int playerId)
+        public List<ServerMatchAction> GetActionsById(int playerId)
         {
             //aaaa单
            return Left?.PlayerId == playerId&&!Ex.Equals("pw") ? RightActions : LeftActions;

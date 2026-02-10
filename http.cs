@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Buffers.Text;
 using System.Diagnostics;
 using System.Linq;
@@ -53,7 +54,24 @@ namespace fyserver
                 throw new Exception("编码失败");
             return sb.ToString();
         }
-
+        public static string Encode<T>(T abc)where T:MatchAction
+        {
+            var plaintext = JsonSerializer.Serialize(abc, GameConstants.JsonOptions);
+            StringBuilder sb = new StringBuilder(plaintext.Length * 4 + 256);
+            int len = _xR7qM2vP(plaintext, abc?.ActionId??0, sb, sb.Capacity);
+            if (len < 0)
+                throw new Exception("编码失败");
+            return sb.ToString();
+        }
+        public static string Encode(ServerMatchAction sma)
+        {
+            var plaintext = JsonSerializer.Serialize(sma, GameConstants.JsonOptions);
+            StringBuilder sb = new StringBuilder(plaintext.Length * 4 + 256);
+            int len = _xR7qM2vP(plaintext, sma.ActionId, sb, sb.Capacity);
+            if (len < 0)
+                throw new Exception("编码失败");
+            return sb.ToString();
+        }
         public static string Decode(string encoded, out int actionId)
         {
             StringBuilder sb = new StringBuilder(encoded.Length + 256);
@@ -586,7 +604,8 @@ namespace fyserver
                     {
                         int actionId = 0;
                         string plaintext = Decode(matchActionen.A, out actionId);
-                        matchAction=JsonSerializer.Deserialize<MatchAction>(plaintext,GameConstants.JsonOptions);
+                        matchAction = JsonSerializer.Deserialize<MatchAction>(plaintext, GameConstants.JsonOptions);
+                        matchAction=matchAction with {ActionId = actionId};
                         Console.WriteLine("ActionId：" + actionId);
                         Console.WriteLine("解密结果：" + plaintext);
                     }
@@ -814,15 +833,12 @@ namespace fyserver
                     Console.WriteLine($"正在获取动作，玩家ID：{user.Id}，动作数量：{actions.Count}");
                     foreach (var a in actions) { 
                         Console.ForegroundColor=ConsoleColor.Blue ;
-                        int actionId = 0;
-                        string plantext = Decode(a, out actionId);
-                        Console.WriteLine("\nActionId：" + actionId);
-                        Console.WriteLine("解密结果：" + plantext);
+                        Console.WriteLine(a?.ToString());
                         Console.ForegroundColor = ConsoleColor.White;
                     }
                     if (actions.Count > 0)
                     {
-                        result["actions"] = actions.ToArray();
+                        result["actions"] = actions.Select(x => { return Encode(x); }).ToArray();
                         actions.Clear();
                     }
                     result["match"] = new
@@ -892,9 +908,8 @@ namespace fyserver
                     Console.WriteLine(matchActionen.A);
                     if (matchAction.ActionType.Equals("XActionEndOfTurn")) {
                         Console.WriteLine("OK有个入结束了回合") ;
+                        match.Turns += 1;
                     } 
-
-
                     // 反作弊检查
                     if (config.appconfig.bancheat && matchAction.ActionType == GameConstants.XActionCheat)
                     {
@@ -921,22 +936,36 @@ namespace fyserver
                             else if (matchAction.ActionId >= match.RightMinactionid)
                                 match.RightMinactionid = matchAction.ActionId;
                         }
-
                         if (user.Id == match.Left?.PlayerId)
                         {
-                            match.LeftActions.Add(matchActionen.A);
+                            var a = new ServerMatchAction(TurnNumer : match.Turns,
+                                SubActions:new(),
+                                Action: matchAction.Action, 
+                                ActionData:matchAction.ActionData,
+                                ActionId:matchAction.ActionId,
+                                Value:matchAction.Value,
+                                PlayerId:matchAction.PlayerId,ActionType:matchAction.ActionType);
+                            match.LeftActions.Add(a);
                             Console.WriteLine("玩家" + user.Id + "提交了一个动作，当前最小ActionId：" + match.LeftMinactionid);
                         }
                         else
-                            match.RightActions.Add(matchActionen.A);
+                        {
+                            var a = new ServerMatchAction(TurnNumer: match.Turns,
+                                SubActions: new(),
+                                Action: matchAction.Action,
+                                ActionData: matchAction.ActionData,
+                                ActionId: matchAction.ActionId,
+                                Value: matchAction.Value,
+                                PlayerId: matchAction.PlayerId, ActionType: matchAction.ActionType);
+                            match.RightActions.Add(a);
+                        }
                     }
-
                     return Results.Text("OK");
                 });
                 // 7. 调度阶段
                 app.MapPost("/matches/v2/{id}/mulligan", async (int id, MulliganCards mulliganCards, HttpContext context) =>
                 {
-                    var user = await GetUserFromAuthAsync(context);
+                     var user = await GetUserFromAuthAsync(context);
                     if (user == null)
                         return Results.Unauthorized();
 
@@ -955,51 +984,73 @@ namespace fyserver
                         hand = match.RightHand;
                         match.PlayerStatusRight = GameConstants.MulliganDone;
                     }
-
                     var result = new MulliganResult(
                         Deck: deck,
                         ReplacementCards: new List<MatchCard>()
                     );
-                    Console.WriteLine("deck"+deck.Count);
-                    foreach (var cardId in mulliganCards.DiscardedCardIds)
+                    //Console.WriteLine("deck"+deck.Count);
+                    //foreach (var cardId in mulliganCards.DiscardedCardIds)
+                    //{
+                    //    foreach (var card in hand)
+                    //    {
+                    //        if (card.CardId == cardId)
+                    //        {
+                    //            var randomIndex = Random.Shared.Next(result.Deck.Count);
+                    //            //// 交换位置
+                    //            // Use record 'with' to create new instances and preserve immutability.
+                    //            var deckCard = result.Deck[randomIndex];
+
+                    //            // The value added to ReplacementCards should reflect the deck card
+                    //            // but with the hand card's location info (matching previous tuple-swap behavior).
+                    //            var replacementCard = deckCard with
+                    //            {
+                    //                Location = card.Location,
+                    //                LocationNumber = card.LocationNumber
+                    //            };
+
+                    //            // The deck slot will be replaced by the hand card but keep the original deck location info.
+                    //            var newDeckEntry = card with
+                    //            {
+                    //                Location = deckCard.Location,
+                    //                LocationNumber = deckCard.LocationNumber
+                    //            };
+                    //            result.ReplacementCards.Add(replacementCard);
+                    //            result.Deck[randomIndex] = newDeckEntry;
+                    //            break;
+                    //        }
+                    //    }
+                    //}
+                    //if (user.Id == match.Left?.PlayerId)
+                    //    match.MulliganLeft = result;
+                    //else
+                    //    match.MulliganRight = result;
+                    foreach (var id2 in mulliganCards.DiscardedCardIds)
                     {
-                        foreach (var card in hand)
+                        // 1. 定位手牌
+                        int handIndex = hand.FindIndex(c => c.CardId == id2);
+                        if (handIndex == -1) continue;
+                        var cardInHand = hand[handIndex];
+                        // 2. 随机选取牌库中的一张牌
+                        int deckIndex = Random.Shared.Next(result.Deck.Count);
+                        var cardInDeck = result.Deck[deckIndex];
+                        // 3. 使用 'with' 交换位置信息 (Location 和 LocationNumber)
+                        // 产生一张 “带着旧手牌位置信息” 的新手牌
+                        var newHandCard = cardInDeck with
                         {
-                            if (card.CardId == cardId)
-                            {
-                                var randomIndex = Random.Shared.Next(result.Deck.Count);
-                                //// 交换位置
-                                // Use record 'with' to create new instances and preserve immutability.
-                                var deckCard = result.Deck[randomIndex];
-
-                                // The value added to ReplacementCards should reflect the deck card
-                                // but with the hand card's location info (matching previous tuple-swap behavior).
-                                var replacementCard = deckCard with
-                                {
-                                    Location = card.Location,
-                                    LocationNumber = card.LocationNumber
-                                };
-
-                                // The deck slot will be replaced by the hand card but keep the original deck location info.
-                                var newDeckEntry = card with
-                                {
-                                    Location = deckCard.Location,
-                                    LocationNumber = deckCard.LocationNumber
-                                };
-                                result.ReplacementCards.Add(replacementCard);
-                                result.Deck[randomIndex] = newDeckEntry;
-                                break;
-                            }
-                        }
+                            Location = cardInHand.Location,
+                            LocationNumber = cardInHand.LocationNumber
+                        };
+                        // 产生一张 “带着旧牌库位置信息” 的旧手牌
+                        var newDeckCard = cardInHand with
+                        {
+                            Location = cardInDeck.Location,
+                            LocationNumber = cardInDeck.LocationNumber
+                        };
+                        result.ReplacementCards.Add(newHandCard); // 这张牌将进入玩家手牌
+                        result.Deck[deckIndex] = newDeckCard; // 旧牌被洗回牌库对应位置
                     }
-
-                    if (user.Id == match.Left?.PlayerId)
-                        match.MulliganLeft = result;
-                    else
-                        match.MulliganRight = result;
                     return Results.Ok(result);
                 });
-
                 app.MapGet("/matches/v2/{id}/mulligan/{location}", (int id, string location) =>
                 {
                     if (!config.appconfig.MatchedPairs.TryGetValue(id, out var match))
