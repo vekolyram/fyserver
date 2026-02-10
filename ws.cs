@@ -24,14 +24,20 @@ namespace fyserver
                         var userId = 0;
                     if (auth != null&&!(auth.Equals("")))
                     {
-                        var user = (await GlobalState.users.GetByUserNameAsync(auth));
-                        if (user == null)
+                        try
                         {
-                            // webSocket.CloseAsync(WebSocketCloseStatus.PolicyViolation, "Unauthorized", CancellationToken.None);
-                            userId = -1; // 使用 -1 表示未认证用户
+                            var user = (await GlobalState.users.GetByUserNameAsync(http.Decode(auth, out var actionId)));
+                            if (user == null)
+                            {
+                                // webSocket.CloseAsync(WebSocketCloseStatus.PolicyViolation, "Unauthorized", CancellationToken.None);
+                                userId = -1; // 使用 -1 表示未认证用户
+                            }
+                            else
+                                userId = user.Id;
                         }
-                        else
-                            userId = user.Id;
+                        catch {
+                            userId = -2; // 使用 -2 表示认证失败（例如解密错误）
+                        }
                     }
                     else
                         userId = -1;
