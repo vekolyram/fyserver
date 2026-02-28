@@ -23,6 +23,10 @@ namespace fyserver
                                 GlobalState.ReloadStoreConfig();
                                 TempWriteLine("商店配置已重新加载。");
                                 break;
+                            case "cm":
+                               config.appconfig.MatchedPairs.Clear();
+                                TempWriteLine("清空。");
+                                break;
                             case "savedbfo":
                                 if (File.Exists("./YCDR"))
                                 {
@@ -44,7 +48,7 @@ namespace fyserver
                                 TempWriteLine("所有用户数据已清除。");
                                 break;
                             case "help":
-                                TempWriteLine("可用命令：reloadstore, clearusers, help, savedb, exit, exitall");
+                                TempWriteLine("可用命令：reloadstore, clearusers, help, savedbfo, savedbss, exit, exitall");
                                 break;
                             case "exitall":
                                 TempWriteLine("行");

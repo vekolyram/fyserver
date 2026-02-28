@@ -24,11 +24,11 @@ namespace fyserver
         );
 
         public static readonly List<Item> Items = new()
-    {
-    };
+        {
+        };
 
         public static Dictionary<string, CardLookup> DeckCodeTable = new();
-        public static void InitLibrary(string Path, string path2,string p3)
+        public static void InitLibrary(string Path, string path2, string p3)
         {
             List<Card> cs = JsonConvert.DeserializeObject<List<Card>>(File.ReadAllText(Path));
             List<string> emojis = JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(path2));
@@ -39,8 +39,9 @@ namespace fyserver
                 DeckCodeTable.Add(c.deck_code_id, new CardLookup(c.card, c.deck_code_id, c.ID));
                 //现在我打算把桌饰写出来
             }
-            foreach (var e in emojis) {
-                Items.Add(new("{}",e,0));
+            foreach (var e in emojis)
+            {
+                Items.Add(new("{}", e, 0));
             }
             foreach (var c in cbs)
             {
@@ -61,17 +62,25 @@ namespace fyserver
     );
 
     public record MatchAction(
-        string Action = "",
-        string ActionType = "",
         int ActionId = 0,
-        Dictionary<string, object>? Value = null,
+        string ActionType = "",
         int? PlayerId = null,
         Dictionary<string, object>? ActionData = null,
-        int LocalSubactions = 0
+        object[]? sub_actions = null,
+        int turn_number = 0,
+        string Action = "",
+        Dictionary<string, object>? Value = null,
+        int SendActionId = 0
+    //int LocalSubactions = 0
     );
-    public record ServerMatchAction  (
-         int TurnNumer ,
-         List<Object> SubActions ,
+    public record MatchPut(
+        int MinActionId = 0,
+        int OpponentId = 0,
+        long TimeSinceOpponentPing = 0
+    );
+    public record ServerMatchAction(
+         int TurnNumer,
+         List<Object> SubActions,
           string Action = "",
         string ActionType = "",
         int ActionId = 0,
@@ -79,7 +88,7 @@ namespace fyserver
         int? PlayerId = null,
         Dictionary<string, object>? ActionData = null
     );
-    public record MatchActionEn (
+    public record MatchActionEn(
         string A
     );
     public record MulliganCards(
@@ -93,7 +102,7 @@ namespace fyserver
         int LocationNumber,
         string Name
     );
-    public record MatchLocation (
+    public record MatchLocation(
         int CardId,
         bool IsGold,
         string Location,
@@ -114,7 +123,7 @@ namespace fyserver
         List<MatchCard> StartingHandLeft,
         List<MatchCard> StartingHandRight,
         List<MatchCard> DeckLeft,
-        List<MatchCard> DeckRight, 
+        List<MatchCard> DeckRight,
         List<string> EquipmentLeft,
         List<string> EquipmentRight,
         bool IsAiMatch,
@@ -279,7 +288,7 @@ namespace fyserver
     // WebSocket messages as records
     public record WebSocketMessage(
         string Timestamp,
-        string Context="",
+        string Context = "",
         string Message = "",
         string Channel = "",
         string Sender = "",
@@ -428,7 +437,8 @@ namespace fyserver
     {
         public readonly FasterKvService _db;
         private readonly bool _ownsConnection;
-        public void Record2() {
+        public void Record2()
+        {
             _db.Checkpoint();
         }
         public void Record1()
@@ -657,18 +667,21 @@ namespace fyserver
         {
         }
 
-        public MatchInfo(int matchId, LobbyPlayer left, LobbyPlayer right,string ex)
+        public MatchInfo(int matchId, LobbyPlayer left, LobbyPlayer right, string ex)
         {
             MatchId = matchId;
             Left = left;
             Right = right;
-            LeftActions = new ();
-            RightActions = new ();
+            currentActionId = 1;
+            MatchActions = new();
+            //RightActions = new ();
             PlayerStatusLeft = GameConstants.NotDone;
             PlayerStatusRight = GameConstants.NotDone;
             Ex = ex;
+            /*
             LeftMinactionid = 0;
             RightMinactionid = 0;
+            */
             //MatchStartingInfo = new(new(left.PlayerId,"left",new(),config.appconfig.getAddressHttpR()+"/matches/v2/"+matchId+"/actions",0,0,left.DeckId,right.DeckId,1,matchId,"", config.appconfig.getAddressHttpR() + "/matches/v2/" +,DateTimeOffset.UtcNow.ToString(),new(),left.PlayerId,right.PlayerId,GameConstants.R),new());
         }
         public int MatchId { get; set; }
@@ -677,8 +690,10 @@ namespace fyserver
         public LobbyPlayer? Left { get; set; }
         public LobbyPlayer? Right { get; set; }
         public int Turns { get; set; } = 0;
-        public List<ServerMatchAction> LeftActions { get; set; } = new();
-        public List<ServerMatchAction> RightActions { get; set; } = new();
+        public List<MatchAction> MatchActions { get; set; } = new();
+        public int currentActionId { get; set; } = 1;
+        public int EndResolutionActionId { get; set; } = 0;
+        //public List<MatchAction> RightActions { get; set; } = new();
         public string PlayerStatusLeft { get; set; } = "not_done";
         public string PlayerStatusRight { get; set; } = "not_done";
         public MulliganResult? MulliganLeft { get; set; }
@@ -687,8 +702,10 @@ namespace fyserver
         public List<MatchCard> RightDeck { get; set; } = new();
         public List<MatchCard> LeftHand { get; set; } = new();
         public List<MatchCard> RightHand { get; set; } = new();
+        /*
         public int LeftMinactionid { get; set; }
         public int RightMinactionid { get; set; }
+        */
         public string? WinnerSide { get; set; }
 
         public bool HasPlayer(int playerId)
@@ -700,11 +717,21 @@ namespace fyserver
         {
             return Left?.PlayerId == playerId ? Left : Right;
         }
-
-        public List<ServerMatchAction> GetActionsById(int playerId)
+        public List<MatchAction> GetActionsByMinActionId(int minActionId)
         {
-            //aaaa单
-           return Left?.PlayerId == playerId&&!Ex.Equals("pw") ? RightActions : LeftActions;
+            if (MatchActions.Count == 0)
+                return new List<MatchAction>();
+
+            if (minActionId <= 1)
+                return new List<MatchAction>(MatchActions);
+
+            var startIndex = minActionId - 1;
+            if (startIndex >= MatchActions.Count)
+                return new List<MatchAction>();
+
+            var count = MatchActions.Count - startIndex;
+            return MatchActions.GetRange(startIndex, count);
+            //return Left?.PlayerId == playerId&&!Ex.Equals("pw") ? RightActions : LeftActions;
         }
     }
     // 静态常量和工具类
@@ -731,7 +758,7 @@ namespace fyserver
         public static readonly List<string> AllyFactions = new() { "Germany", "Britain", "Soviet", "USA", "Japan", "France", "Italy", "Poland", "Finland" };
         // 动作类型
         public const string XActionCheat = "XActionCheat";
-        public static  readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+        public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             WriteIndented = false

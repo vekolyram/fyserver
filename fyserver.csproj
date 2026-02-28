@@ -31,9 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Update="library\bitemLib.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Update="library\cardbackLib.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
