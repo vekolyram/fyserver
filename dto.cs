@@ -78,6 +78,7 @@ namespace fyserver
         int OpponentId = 0,
         long TimeSinceOpponentPing = 0
     );
+    /*
     public record ServerMatchAction(
          int TurnNumer,
          List<Object> SubActions,
@@ -88,6 +89,7 @@ namespace fyserver
         int? PlayerId = null,
         Dictionary<string, object>? ActionData = null
     );
+    */
     public record MatchActionEn(
         string A
     );
@@ -171,6 +173,18 @@ namespace fyserver
         MatchData Match,
         StartingData StartingData
     );
+
+    public class MatchReconnect {
+        public string[] Actions { get; set; }
+        public bool LocalSubactions { get; set; }
+        public MatchData Match { get; set; }
+        public MulliganResult MulliganLeft { get; set; }
+        public MulliganResult MulliganRight { get; set; }
+        public bool SameTurn { get; set; }
+        public StartingData StartingData { get; set; }
+        public int TimeSinceStartOfTurn { get; set; }
+        public bool WaitingForSitNGoMatch { get; set; }
+    };
 
     public record MatchStartingInfo(
         bool LocalSubactions,
@@ -661,6 +675,22 @@ namespace fyserver
       string item_id,
               int cnt = 0
         );
+    
+    public record ClaimItemData (
+        int Dust,
+        [property: JsonPropertyName("isGold")] bool? IsGold,
+        [property: JsonPropertyName("itemType")] string ItemType,
+        string Name
+    );
+    public record ClaimItem (
+        ClaimItemData Data,
+        int Qty
+    );
+    public record Claim (
+        int Dust,
+        List<ClaimItem> Items
+    );
+
     public class MatchInfo
     {
         public MatchInfo()
@@ -686,7 +716,7 @@ namespace fyserver
         }
         public int MatchId { get; set; }
         public string Ex { get; set; } = "";
-        public dynamic? MatchStartingInfo { get; set; }
+        public MatchStartingInfo? MatchStartingInfo { get; set; }
         public LobbyPlayer? Left { get; set; }
         public LobbyPlayer? Right { get; set; }
         public int Turns { get; set; } = 0;

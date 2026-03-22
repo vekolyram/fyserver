@@ -7,6 +7,7 @@ using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace fyserver
 {
@@ -65,6 +66,7 @@ namespace fyserver
                 throw new Exception("编码失败");
             return sb.ToString();
         }
+        /*
         public static string Encode(ServerMatchAction sma)
         {
             var plaintext = JsonSerializer.Serialize(sma, GameConstants.JsonOptions);
@@ -74,6 +76,7 @@ namespace fyserver
                 throw new Exception("编码失败");
             return sb.ToString();
         }
+        */
         public static string Decode(string encoded, out int actionId)
         {
             StringBuilder sb = new StringBuilder(encoded.Length + 256);
@@ -396,6 +399,10 @@ namespace fyserver
                 {
                     return Results.Ok(PlayerLibrary.Library);
                 });
+                app.MapGet("/players/{id}/library", (string id) =>
+                {
+                    return Results.Ok(PlayerLibrary.Library);
+                });
             }
             void MakeDecksEndpoints()
             {
@@ -523,6 +530,35 @@ namespace fyserver
                 user.EquippedItem.Add(item);
                 await GlobalState.users.SaveUserAsync(user);
                 return Results.Created();
+            });
+            app.MapPut("/crate/claim", () =>
+            {
+                Claim c = new
+                (
+                    1000,
+                    new()
+                    {
+                        new (
+                            new (
+                               1000,
+                               null,
+                               "card",
+                               "card_wildcard_elite"
+                            ),
+                            5
+                        ),
+                        new (
+                            new (
+                               1000,
+                               null,
+                               "gold",
+                               ""
+                            ),
+                            30
+                        )
+                    }
+                );
+                return Results.Ok(c);
             });
 
             void RemovePlayerFromAllQueues(int playerId)
@@ -932,7 +968,7 @@ namespace fyserver
                                 LeftIsOnline: 1,
                                 //LeftIsOnline:1,
                                 MatchId: match.MatchId,
-                                MatchType: "training",
+                                MatchType: "battle",
                                 MatchUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}",
                                 ModifyDate: DateTime.UtcNow.ToString("o"),
                                 Notifications: new List<object>(),
@@ -1031,9 +1067,42 @@ namespace fyserver
                     cards = [.. cards.OrderBy(_ => Random.Shared.Next()).Select((a, l) => a with { LocationNumber = l })];
                     return (cards, locationCard);
                 }
-                app.MapGet("/matches/v2/reconnect", () =>
+                app.MapGet("/matches/v2/reconnect", async (HttpContext context) =>
                 {
-                    return Results.Ok("");
+                    var user = await GetUserFromAuthAsync(context);
+                    foreach (var i in config.appconfig.MatchedPairs)
+                    {
+                        MatchInfo mi = i.Value;
+                        if ((mi.WinnerSide != "left" && mi.WinnerSide != "right") && (mi.Left.PlayerId == user.Id || mi.Right.PlayerId == user.Id))
+                        {
+                            MatchReconnect mr = new()
+                            {
+                                Actions = [],
+                                LocalSubactions = true,
+                                Match = mi.MatchStartingInfo.MatchAndStartingData.Match with
+                                {
+                                    CurrentActionId = mi.currentActionId,
+                                    CurrentTurn = mi.Turns,
+                                    PlayerStatusLeft = mi.PlayerStatusLeft,
+                                    PlayerStatusRight = mi.PlayerStatusRight,
+                                    Status = "running"
+                                },
+                                MulliganLeft = mi.MulliganLeft,
+                                MulliganRight = mi.MulliganRight,
+                                SameTurn = false,
+                                StartingData = mi.MatchStartingInfo.MatchAndStartingData.StartingData,
+                                TimeSinceStartOfTurn = -1,
+                                WaitingForSitNGoMatch = false
+                            };
+                            var actions = mi.GetActionsByMinActionId(0);
+                            if (actions.Count > 0)
+                            {
+                                mr.Actions = actions.Select(x => { return Encode(x); }).ToArray();
+                            }
+                            return Results.Ok(mr);
+                        }
+                    }
+                    return Results.Ok("null");
                 });
                 app.MapGet("/matches/v2/{id}", (int id) =>
                 {
