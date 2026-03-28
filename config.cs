@@ -9,7 +9,8 @@ namespace fyserver
     {
         public static FasterUserStoreService users = new FasterUserStoreService();
         private static StoreConfig? _storeConfig;
-       // private static FPResponse? _frontPageConfig;
+        //private static MiniSitNGoConfig? _miniSitNGoConfig;
+        // private static FPResponse? _frontPageConfig;
 
         public static StoreConfig GetStoreConfig()
         {
@@ -37,6 +38,51 @@ namespace fyserver
         {
             _storeConfig = null;
         }
+        /*
+        public static MiniSitNGoConfig GetMiniSitNGoConfig()
+        {
+            if (_miniSitNGoConfig == null)
+            {
+                string configPath = "./config/miniSitNGo.json";
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    _miniSitNGoConfig = JsonConvert.DeserializeObject<MiniSitNGoConfig>(json);
+                }
+                else
+                {
+                    _miniSitNGoConfig = new(
+                        reward: new("random_pack"),
+                        localization: new(
+                            new(
+                                [
+                                    "WCNM",
+                                    "谢谢"
+                                ],
+                                ""
+                            )
+                        ),
+                        starting_kredits: 5,
+                        skip_start_of_turn_draw: "True",
+                        draw_card_on_destroy_enemy: "True",
+                        choose_spawn_card_on_start_of_turn: new(
+                            0,
+                            [
+                                "the_war_machine",
+                                "plan",
+                                "554th_rifle_regiment"
+                            ]
+                        )
+                    );
+                }
+            }
+            return _miniSitNGoConfig;
+        }
+        public static void ReloadMiniSitNGoConfig()
+        {
+            _miniSitNGoConfig = null;
+        }
+        */
     }
 
     public class StoreConfig
@@ -58,6 +104,10 @@ namespace fyserver
         //public Random rand=new();
         public List<LobbyPlayer> WaitingPlayers1 = [];
         public List<LobbyPlayer> WaitingPlayers2 = [];
+        public List<LobbyPlayer> WaitingPlayersClassic = [];
+        public List<LobbyPlayer> WaitingPlayersUnranked = [];
+        public List<LobbyPlayer> WaitingPlayersDraft = [];
+        public List<LobbyPlayer> WaitingPlayersBrawl = [];
         public ConcurrentDictionary<string, List<LobbyPlayer>> BattleCodePlayers = [];
         public ConcurrentDictionary<int, MatchInfo> MatchedPairs = new();
         public readonly ConcurrentDictionary<int, WebSocket> UsersById = new();

@@ -189,6 +189,14 @@ namespace fyserver
                         ClientId: user.Id,
                         Currency: "USD",
                         CurrentKnockoutTourney: new Dictionary<string, object>(),
+                        CurrentMiniSitNGo: new(
+                            "2026-05-01T18:00:00.000000Z",
+                            false,
+                            114514,
+                            "Skirmish #91",
+                            File.Exists("./config/current_mini_sit_n_go.json") ? File.ReadAllText("./config/current_mini_sit_n_go.json") : "",
+                            "2026-03-27T12:00:00.000000Z"
+                        ),
                         DailymissionsUrl: $"{addressHttp}/players/{user.Id}/dailymissions",
                         Decks: new Dictionary<string, object>
                         {
@@ -565,7 +573,11 @@ namespace fyserver
             {
                 config.appconfig.WaitingPlayers1.RemoveAll(p => p.PlayerId == playerId);
                 config.appconfig.WaitingPlayers2.RemoveAll(p => p.PlayerId == playerId);
-                foreach (var code in config.appconfig.BattleCodePlayers.Keys.ToList())
+                config.appconfig.WaitingPlayersClassic.RemoveAll(p => p.PlayerId == playerId);
+                config.appconfig.WaitingPlayersUnranked.RemoveAll(p => p.PlayerId == playerId);
+                config.appconfig.WaitingPlayersDraft.RemoveAll(p => p.PlayerId == playerId);
+                config.appconfig.WaitingPlayersBrawl.RemoveAll(p => p.PlayerId == playerId);
+                foreach (var code in config.appconfig.BattleCodePlayers.Keys)
                 {
                     config.appconfig.BattleCodePlayers[code].RemoveAll(p => p.PlayerId == playerId);
                 }
@@ -631,10 +643,22 @@ namespace fyserver
                 RemovePlayerFromAllQueues(lobbyPlayer.PlayerId);
                 RemovePlayerActiveMatches(lobbyPlayer.PlayerId, "requeue");
 
-                // 对战码匹配
-                if (lobbyPlayer.ExtraData.StartsWith("battle_code:"))
+                string exData = "training";
+                try
                 {
-                    var code = lobbyPlayer.ExtraData["battle_code:".Length..];
+                    exData = lobbyPlayer.ExtraData.GetString();
+                }
+                catch
+                {
+                    exData = "training";
+                }
+
+                Console.WriteLine(exData);
+
+                // 对战码匹配
+                if (exData.StartsWith("battle_code:"))
+                {
+                    var code = exData["battle_code:".Length..];
                     if (!config.appconfig.BattleCodePlayers.ContainsKey(code))
                         config.appconfig.BattleCodePlayers[code] = new List<LobbyPlayer>();
 
@@ -644,7 +668,7 @@ namespace fyserver
                     if (players.Count >= 2)
                     {
                         var matchId = GenerateMatchId();
-                        var matchInfo = new MatchInfo(matchId, players[0], players[1], "bc" + code);
+                        var matchInfo = new MatchInfo(matchId, players[0], players[1], "battle_code:" + code);
                         players.RemoveAt(0);
                         players.RemoveAt(0);
 
@@ -652,7 +676,7 @@ namespace fyserver
                     }
                 }
                 // 普通匹配
-                else if (lobbyPlayer.ExtraData == "")
+                else if (exData == "training")
                 {
                     Console.WriteLine("检测到匹配：" + lobbyPlayer.ToString());
                     config.appconfig.WaitingPlayers1.Add(lobbyPlayer);
@@ -674,15 +698,67 @@ namespace fyserver
                         Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                     }
                 }
-                else
+                else if (exData == "")
                 {
                     config.appconfig.WaitingPlayers2.Add(lobbyPlayer);
                     if (config.appconfig.WaitingPlayers2.Count >= 2)
                     {
                         var matchId = GenerateMatchId();
-                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1], "xx");
+                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayers2[0], config.appconfig.WaitingPlayers2[1], "");
                         config.appconfig.WaitingPlayers2.RemoveAt(0);
                         config.appconfig.WaitingPlayers2.RemoveAt(0);
+                        config.appconfig.MatchedPairs[matchId] = matchInfo;
+                        Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
+                    }
+                }
+                else if (exData == "classic")
+                {
+                    config.appconfig.WaitingPlayersClassic.Add(lobbyPlayer);
+                    if (config.appconfig.WaitingPlayersClassic.Count >= 2)
+                    {
+                        var matchId = GenerateMatchId();
+                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayersClassic[0], config.appconfig.WaitingPlayersClassic[1], "classic");
+                        config.appconfig.WaitingPlayersClassic.RemoveAt(0);
+                        config.appconfig.WaitingPlayersClassic.RemoveAt(0);
+                        config.appconfig.MatchedPairs[matchId] = matchInfo;
+                        Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
+                    }
+                }
+                else if (exData == "unranked")
+                {
+                    config.appconfig.WaitingPlayersUnranked.Add(lobbyPlayer);
+                    if (config.appconfig.WaitingPlayersUnranked.Count >= 2)
+                    {
+                        var matchId = GenerateMatchId();
+                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayersUnranked[0], config.appconfig.WaitingPlayersUnranked[1], "unranked");
+                        config.appconfig.WaitingPlayersUnranked.RemoveAt(0);
+                        config.appconfig.WaitingPlayersUnranked.RemoveAt(0);
+                        config.appconfig.MatchedPairs[matchId] = matchInfo;
+                        Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
+                    }
+                }
+                else if (exData == "draft")
+                {
+                    config.appconfig.WaitingPlayersDraft.Add(lobbyPlayer);
+                    if (config.appconfig.WaitingPlayersDraft.Count >= 2)
+                    {
+                        var matchId = GenerateMatchId();
+                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayersDraft[0], config.appconfig.WaitingPlayersDraft[1], "draft");
+                        config.appconfig.WaitingPlayersDraft.RemoveAt(0);
+                        config.appconfig.WaitingPlayersDraft.RemoveAt(0);
+                        config.appconfig.MatchedPairs[matchId] = matchInfo;
+                        Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
+                    }
+                }
+                else if (exData == "brawl")
+                {
+                    config.appconfig.WaitingPlayersBrawl.Add(lobbyPlayer);
+                    if (config.appconfig.WaitingPlayersBrawl.Count >= 2)
+                    {
+                        var matchId = GenerateMatchId();
+                        var matchInfo = new MatchInfo(matchId, config.appconfig.WaitingPlayersBrawl[0], config.appconfig.WaitingPlayersBrawl[1], "brawl");
+                        config.appconfig.WaitingPlayersBrawl.RemoveAt(0);
+                        config.appconfig.WaitingPlayersBrawl.RemoveAt(0);
                         config.appconfig.MatchedPairs[matchId] = matchInfo;
                         Console.WriteLine("匹配成功，信息为" + matchInfo.ToString());
                     }
@@ -691,12 +767,7 @@ namespace fyserver
             });
             app.MapDelete("/lobbyplayers", ([FromBody] LobbyPlayer lobbyPlayer) =>
             {
-                config.appconfig.WaitingPlayers1.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
-                config.appconfig.WaitingPlayers2.RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
-                foreach (var code in config.appconfig.BattleCodePlayers.Keys)
-                {
-                    config.appconfig.BattleCodePlayers[code].RemoveAll(p => p.PlayerId == lobbyPlayer.PlayerId);
-                }
+                RemovePlayerFromAllQueues(lobbyPlayer.PlayerId);
                 return Results.Ok(new { status = 200 });
             });
             void MakeMatchEndpoints()
@@ -949,6 +1020,13 @@ namespace fyserver
                         card with { Location = "deck_left", LocationNumber = leftStartingHandCount + index }).ToList();
                     match.RightDeck = rightCards.Skip(rightStartingHandCount).Select((card, index) =>
                         card with { Location = "deck_right", LocationNumber = rightStartingHandCount + index }).ToList();
+
+                    string matchType = "battle";
+                    if (match.Ex.StartsWith("battle_code")) matchType = "code";
+                    else if (match.Ex == "brawl") matchType = "brawl";
+                    else if (match.Ex == "draft") matchType = "draft";
+                    else if (match.Ex == "training" || match.Ex == "pw") matchType = "training";
+
                     // 构建MatchStartingInfo
                     match.MatchStartingInfo = new MatchStartingInfo(
                         LocalSubactions: true,
@@ -968,7 +1046,7 @@ namespace fyserver
                                 LeftIsOnline: 1,
                                 //LeftIsOnline:1,
                                 MatchId: match.MatchId,
-                                MatchType: "battle",
+                                MatchType: matchType,
                                 MatchUrl: $"{config.appconfig.getAddressHttpR()}/matches/v2/{match.MatchId}",
                                 ModifyDate: DateTime.UtcNow.ToString("o"),
                                 Notifications: new List<object>(),
@@ -1198,7 +1276,7 @@ namespace fyserver
                         status = "running"
                     };
 
-                    //result["opponent_polling"] = true;
+                    result["opponent_polling"] = true;
 
                     if (!string.IsNullOrEmpty(match.WinnerSide))
                     {

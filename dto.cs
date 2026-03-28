@@ -58,7 +58,7 @@ namespace fyserver
     public record LobbyPlayer(
         int PlayerId,
         int DeckId,
-        string ExtraData = ""
+        JsonElement ExtraData
     );
 
     public record MatchAction(
@@ -230,6 +230,38 @@ namespace fyserver
         string Username,
         string Password
     );
+    public record MiniSitNGo(
+        string EndDate,
+        [property: JsonPropertyName("hasWon")] bool HasWon,
+        int Id,
+        string Name,
+        string RulesJsonStr,
+        string StartDate
+    );
+    /*
+    public record MiniSitNGoReward(
+        string type
+    );
+    public record MiniSitNGoLocalizationItem(
+        string[] rules_list,
+        string description
+    );
+    public record MiniSitNGoLocalization(
+        [property: JsonPropertyName("ZH-HANS")] MiniSitNGoLocalizationItem zh_hans
+    );
+    public record MiniSitNGoChooseSpawnCardOnStartOfTurnConfig(
+        int cost,
+        string[] cards
+    );
+    public record MiniSitNGoConfig(
+        MiniSitNGoReward reward,
+        MiniSitNGoLocalization localization,
+        int starting_kredits,
+        string skip_start_of_turn_draw,
+        string draw_card_on_destroy_enemy,
+        MiniSitNGoChooseSpawnCardOnStartOfTurnConfig choose_spawn_card_on_start_of_turn
+    );
+    */
     public record Entitlement(
     string EntitlementType,
     string Name
@@ -845,6 +877,7 @@ namespace fyserver
         int ClientId,
         string Currency,
         Dictionary<string, object> CurrentKnockoutTourney,
+        MiniSitNGo CurrentMiniSitNGo,
         string DailymissionsUrl,
         Dictionary<string, object> Decks,
         string DecksUrl,

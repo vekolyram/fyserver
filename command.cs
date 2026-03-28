@@ -23,6 +23,12 @@ namespace fyserver
                                 GlobalState.ReloadStoreConfig();
                                 TempWriteLine("商店配置已重新加载。");
                                 break;
+                                /*
+                            case "reloadmsng":
+                                GlobalState.ReloadMiniSitNGoConfig();
+                                TempWriteLine("乱斗配置已重新加载。");
+                                break;
+                                */
                             case "cm":
                                config.appconfig.MatchedPairs.Clear();
                                 TempWriteLine("清空。");
